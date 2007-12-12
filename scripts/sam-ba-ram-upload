@@ -1,0 +1,63 @@
+#!/bin/bash -e
+
+# copyright 2007 mza (Matthew Andrew)
+# started 2007-09-19 (talk like a pirate day)
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+# or visit http://www.fsf.org/
+
+declare filename="/tmp/sam-i-am-script"
+declare -i number
+if [ -e /dev/ttyUSB0 ]; then
+	if [ -e /dev/ttyUSB1 ]; then
+		echo "error:  both /dev/ttyUSB[01] devices exist" >> /dev/stderr
+		exit 1
+	else
+		number=0
+	fi
+else
+	number=1
+fi
+echo "using device /dev/ttyUSB${number}..."
+echo "open /dev/ttyUSB${number}" > "${filename}"
+
+function sram {
+	cat >>"${filename}" <<-endofline1
+		version
+		send work/blink-led.hex
+		go
+		exit
+endofline1
+}
+
+function flash {
+	cat >>"${filename}" <<-endofline2
+		version
+		writew 0xffffff64 0x5a001004
+		flash work/blink-led.hex
+		go
+		exit
+endofline2
+}
+
+sram
+#flash # remember the lock bits can only be changed 100 times and #1 is already past that!
+
+echo "the contents of the scipt file are:"
+cat "${filename}"
+
+echo "executing script..."
+Sam_I_Am -x "${filename}"
+

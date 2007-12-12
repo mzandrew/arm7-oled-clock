@@ -1,0 +1,28 @@
+# copyright 2007 mza (Matthew Andrew)
+# started 2007-09-19 (talk like a pirate day)
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+# or visit http://www.fsf.org/
+
+halt
+sleep 200
+#mdw 0x200000 256
+mdw 0x200000 512
+#mdh 0x200000 512
+sleep 200
+resume
+sleep 200
+shutdown
+

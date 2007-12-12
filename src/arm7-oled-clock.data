@@ -1,0 +1,82 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.align	4
+.data	@ non-zero initialized ram variables (gets stored in flash; must be copied to ram)
+
+.global set_clock_block
+.global get_clock_block
+
+.align	4
+address_of_spi_rtc_to_read_block:	.byte 0
+@.space 10
+
+.align	4
+@	.byte	0, 0, 23, 0b01001000, 3, 23, 4, 07
+	@ to set the clock, use this:
+set_clock_block_read:
+	.byte	0x0, 0, 0, 0b01000100, 2, 1, 0x10, 0x07	@ read
+set_clock_block_write:
+	.byte	0x80	@ write address
+	.byte	0x00	@ seconds
+	.byte	0x48	@ minutes
+	.byte	1<<6 + 0<<5 + 0x06	@ 12=1/24=0 hour + am=1/pm=0 + hours
+	.byte	0x07	@ day of week 0x1-0x7
+	.byte	0x08	@ day of month 0x01-0x31
+	.byte	0x12	@ month of year 0x01-0x12
+	.byte	0x07	@ year of century 0x00-0x99
+
+.align	4
+@one_over_n_fp_lookup_table_12:
+@	.word 4096, 2048, 1365, 1024
+@	.word 819, 683, 585, 512
+@	.word 455, 410, 372, 341
+@	.word 315, 293, 273, 256
+@	.word 241, 228, 216, 205
+
+.align	4
+one_over_n_fp_lookup_table:
+@ these are the 16-bit mantissa fixed-point values for 1/n for n=1 to n=24
+@one_over_n_fp_lookup_table_16:
+	.hword 0, 32768, 21845, 16384
+	.hword 13107, 10923, 9362, 8192
+	.hword 7282, 6554, 5958, 5461
+	.hword 5041, 4681, 4369, 4096
+	.hword 3855, 3641, 3449, 3277
+	.hword 3121, 2979, 2849, 2731
+
+.align	4
+.global	background_color
+background_color:	.word black
+
+.align	4
+hour_hand_color:	.word default_hour_hand_color
+minute_hand_color:	.word default_minute_hand_color
+second_hand_color:	.word default_second_hand_color
+
+line_color:	.word default_line_color
+
+.align	4
+hour_hand_length:	.byte default_hour_hand_length
+minute_hand_length:	.byte default_minute_hand_length
+second_hand_length:	.byte default_second_hand_length
+
+minute_hand_width:	.byte default_hour_hand_width
+hour_hand_width:	.byte default_minute_hand_width
+second_hand_width:	.byte default_second_hand_width
+

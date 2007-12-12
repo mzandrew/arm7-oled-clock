@@ -1,0 +1,97 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.set	default_hour_hand_color, red
+.set	default_minute_hand_color, blue
+.set	default_second_hand_color, green
+
+.set	default_hour_hand_length, 30
+.set	default_minute_hand_length, 38
+.set	default_second_hand_length, 45
+
+.set	default_minute_hand_width, 3
+.set	default_hour_hand_width, 4
+.set	default_second_hand_width, 2
+
+.set	timex_hour_hand_length, 21
+.set	timex_minute_hand_length, 29
+.set	timex_second_hand_length, 29
+
+.set	timex_minute_hand_width, 2
+.set	timex_hour_hand_width, 2
+.set	timex_second_hand_width, 2
+
+.set	display_first_x, 0
+.set	display_first_y, 0
+.set	display_last_x, 127
+.set	display_last_y, 123
+.set	display_width_in_pixels, display_last_x - display_first_x + 1
+.set	display_height_in_pixels, display_last_y - display_first_y + 1
+.set	display_center_x, display_width_in_pixels/2 + display_first_x
+.set	display_center_y, display_height_in_pixels/2 + display_first_y
+.set	display_center_of_hands_x, display_center_x
+.set	display_center_of_hands_y, display_center_y
+
+.set	red,   0b111111000000000000
+.set	green, 0b000000111111000000
+.set	blue,  0b000000000000111111
+.set	dark_red,   0b011111000000000000
+.set	dark_green, 0b000000011111000000
+.set	dark_blue,  0b000000000000011111
+.set	light_red, red+dark_green+dark_blue
+.set	light_green, dark_red+green+dark_blue
+.set	light_blue, dark_red+dark_green+blue
+.set	black, 0
+.set	white, red+green+blue
+.set	grey, dark_red+dark_green+dark_blue
+.set	yellow, red+green
+.set	purple, red+blue
+.set	orange, red+dark_green
+@.set	turquoise, 0b000100011110101010
+.set	turquoise, 0b000000110000100000
+
+.global grey
+
+@ 1 = 134 us
+@ 2 = 242 us
+@ 3 = 468 us
+@ 4 = 900 us
+
+@ 4 = 976 us
+.set	log_base_2_of_how_many_circles_to_draw_for_one_hand, 4
+
+.set	hour_markers_big_radius, 55
+.set	hour_dots_little_radius_0369, 3
+.set	hour_dots_little_radius_others, 2
+.global	one_twelvth_of_the_lookup_table
+@.set	one_twelvth_of_the_lookup_table, 500000
+@.set one_twelvth_fp, (1<<fixed_point_shift_by)/12
+.set	one_twelvth_of_the_lookup_table, 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table*1<<fixed_point_shift_by/12
+.set	one_quarter_of_the_lookup_table, 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table*1<<fixed_point_shift_by/4
+
+.set	default_font_color, white
+.set	character_width, 5
+.set	character_height, 7
+.set	character_horizontal_spacing_between_characters, 1
+.set	font_null, ' 
+
+.set	default_line_color, white
+
+.set	display_routine_offset_x, 2
+.set	display_routine_offset_y, 1
+

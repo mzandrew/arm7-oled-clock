@@ -1,0 +1,225 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.align	4
+.text
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+@.unwind_fnstart
+@.unwind_fnend
+@.func	turn_off_led__asm
+@.endfunc
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.type	turn_off_led__asm,#function
+.global turn_off_led__asm
+turn_off_led__asm:
+	turn_off_led	saveregs=yes
+
+	mov	pc, lr
+
+.type	turn_on_led__asm,#function
+.global turn_on_led__asm
+turn_on_led__asm:
+	turn_on_led	saveregs=yes
+
+	mov	pc, lr
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	fill_ram	fill=0xa5f05a2c
+	ldr	r0, =\fill
+@		ldr	r0, =0x11111111
+	ldr	r1, =0x200000
+	ldr	r2, =0x4000
+0:
+	str	r0, [r1], #4
+	subS	r2, r2, #4
+	bHI	0b
+.endm
+
+clear_ram:
+	ldr	r0, =0
+@		ldr	r0, =0x11111111
+	ldr	r1, =0x200000
+	ldr	r2, =0x4000
+0:
+	str	r0, [r1], #4
+	subS	r2, r2, #4
+	bHI	0b
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+determine_position_of_hour_hand:
+	ldr	r0, =hand_length
+	ldr	r1, =hour_hand_length
+	ldrb	r1, [r1]
+@		debug	r1
+@		debug	r1
+@		debug	r1
+@		debug	r1
+	strb	r1, [r0]
+	ldr	r1, =60
+	ldr	r2, =clock_hours
+	ldrb	r2, [r2]
+@		debug	r2
+	cmp	r2, #12
+	movEQ	r2, #0
+	ldr	r3, =clock_minutes
+	ldrb	r3, [r3]
+	mla	r4, r1, r2, r3
+@	mul	r4, r1, r2
+	ldr	r0, =clock_variable
+	str	r4, [r0]
+@		debug	r4
+@		push	r12
+@		ldr	r12, =dummy_1
+@		str	r4, [r12]
+@		pop	r12
+@	str	r2, [r0]
+	ldr	r0, =ratio_fp
+	ldr	r1, =hours_ratio_fp
+	str	r1, [r0]
+@		debug	r1
+	call	determine_position_of_hand
+	ldr	r0, =current_x_position_of_end_of_hand
+	ldr	r1, =current_x_position_of_end_of_hour_hand
+	ldrb	r0, [r0]
+	strb	r0, [r1]
+	ldr	r0, =current_y_position_of_end_of_hand
+	ldr	r1, =current_y_position_of_end_of_hour_hand
+	ldrb	r0, [r0]
+	strb	r0, [r1]
+	return
+
+determine_position_of_minute_hand:
+	ldr	r0, =hand_length
+	ldr	r1, =minute_hand_length
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r1, =60
+	ldr	r2, =clock_minutes
+	ldrb	r2, [r2]
+	ldr	r3, =clock_seconds
+	ldrb	r3, [r3]
+	mla	r4, r1, r2, r3
+	ldr	r0, =clock_variable
+	str	r4, [r0]
+@		str	r2, [r0]
+	ldr	r0, =ratio_fp
+	ldr	r1, =minutes_ratio_fp
+	str	r1, [r0]
+	call	determine_position_of_hand
+	ldr	r0, =current_x_position_of_end_of_hand
+	ldr	r1, =current_x_position_of_end_of_minute_hand
+	ldrb	r0, [r0]
+	strb	r0, [r1]
+	ldr	r0, =current_y_position_of_end_of_hand
+	ldr	r1, =current_y_position_of_end_of_minute_hand
+	ldrb	r0, [r0]
+	strb	r0, [r1]
+	return
+
+determine_position_of_second_hand:
+	ldr	r0, =hand_length
+	ldr	r1, =second_hand_length
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r0, =10
+	ldr	r1, =clock_seconds
+	ldrb	r1, [r1]
+	ldr	r2, =clock_tenths_of_seconds
+	ldrb	r2, [r2]
+@		debug	r2
+@		mul	r1, r0, r1
+	mla	r1, r0, r1, r2
+@		debug	r1
+	ldr	r0, =clock_variable
+	str	r1, [r0]
+	ldr	r0, =ratio_fp
+	ldr	r1, =seconds_ratio_fp
+	str	r1, [r0]
+	call	determine_position_of_hand
+	ldr	r0, =current_x_position_of_end_of_hand
+	ldr	r1, =current_x_position_of_end_of_second_hand
+	ldrb	r0, [r0]
+	strb	r0, [r1]
+	ldr	r0, =current_y_position_of_end_of_hand
+	ldr	r1, =current_y_position_of_end_of_second_hand
+	ldrb	r0, [r0]
+	strb	r0, [r1]
+	return
+
+determine_position_of_hand:
+	@ draw a series of lines from the originish area to the hour in question-ish area
+	ldr	r0, =clock_variable
+	ldr	r0, [r0]
+@		debug	r0
+	ldr	r1, =ratio_fp
+	ldr	r1, [r1]
+@		debug	r1
+	mul	r2, r0, r1
+	mov	r2, r2, lsr #fixed_point_shift_by
+@		debug	r2
+	ldr	r3, =(1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table)-1
+@		debug	r3
+	cmp	r2, r3
+	movHI	r2, r3
+@		debug	r2
+@		debug	r2
+
+	mov	r6, r2, lsl #1
+@		debug	r6
+@	str	r2, [r12], #4
+@	ldr	r0, =display_center_x
+@	ldr	r1, =display_center_y
+	ldr	r0, =display_center_of_hands_x
+	ldr	r1, =display_center_of_hands_y
+	ldr	r2, =hand_length
+	ldrb	r2, [r2]
+	ldr	r3, =beginning_of_cosine_lookup_table
+	ldrsh	r4, [r3, r6]
+@		debug	r3
+@		debug	r6
+@		debug	r4
+@	str	r4, [r12], #4
+@	mla	r5, r2, r4, r0
+	mul	r5, r2, r4
+	mov	r5, r5, lsr #(1*fixed_point_shift_by)
+	sub	r5, r0, r5
+@	str	r5, [r12], #4
+	ldr	r3, =beginning_of_sine_lookup_table
+	ldrsh	r4, [r3, r6]
+@	str	r4, [r12], #4
+@	mla	r6, r2, r4, r1
+	mul	r6, r2, r4
+	mov	r6, r6, lsr #(1*fixed_point_shift_by)
+	add	r6, r1, r6
+@	str	r6, [r12], #4
+@	str	r12, [r12], #4
+	ldr	r0, =current_x_position_of_end_of_hand
+	strb	r6, [r0]
+	ldr	r0, =current_y_position_of_end_of_hand
+	strb	r5, [r0]
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+

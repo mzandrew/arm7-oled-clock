@@ -1,0 +1,375 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.macro	set_color
+.endm
+
+.macro	draw_circle	center_x_register, center_y_register, radius_register, line_color_register, fill_color_register
+	push	\fill_color_register
+	push	\fill_color_register
+	push	\line_color_register
+	push	\line_color_register
+	push	\radius_register
+	push	\center_y_register
+	push	\center_x_register
+	display_write_command_immediate	0x86
+	pop	\center_x_register
+	display_write_data_register	\center_x_register
+	pop	\center_y_register
+	display_write_data_register	\center_y_register
+	pop	\radius_register
+	display_write_data_register	\radius_register
+	pop	\line_color_register
+	mov	\line_color_register, \line_color_register, lsr #9
+	display_write_data_register	\line_color_register
+	pop	\line_color_register
+	display_write_data_register	\line_color_register
+	pop	\fill_color_register
+	mov	\fill_color_register, \fill_color_register, lsr #9
+	display_write_data_register	\fill_color_register
+	pop	\fill_color_register
+	display_write_data_register	\fill_color_register
+.endm
+
+.macro	draw_line	left_register, right_register, top_register, bottom_register, color_register
+	push	\color_register
+	push	\color_register
+	push	\bottom_register
+	push	\right_register
+	push	\top_register
+	push	\left_register
+	display_write_command_immediate	0x83
+	pop	\left_register
+	display_write_data_register	\left_register
+	pop	\top_register
+	display_write_data_register	\top_register
+	pop	\right_register
+	display_write_data_register	\right_register
+	pop	\bottom_register
+	display_write_data_register	\bottom_register
+	pop	\color_register
+	mov	\color_register, \color_register, lsr #9
+	display_write_data_register	\color_register
+	pop	\color_register
+	display_write_data_register	\color_register
+.endm
+
+.macro	draw_line_imm	left, right, top, bottom, color_cb, color_ba
+	display_write_command_immediate	0x83
+	display_write_data_immediate	\left
+	display_write_data_immediate	\top
+	display_write_data_immediate	\right
+	display_write_data_immediate	\bottom
+	display_write_data_immediate	\color_cb
+	display_write_data_immediate	\color_ba
+.endm
+
+.macro	display_set_start_column_and_end_column	start_column_register, end_column_register, saveregs=no
+	push	\end_column_register
+	push	\start_column_register
+	display_write_command_immediate	command=0x15, saveregs=\saveregs
+	pop	\start_column_register
+	display_write_data_register	data_register=\start_column_register, saveregs=\saveregs
+	pop	\end_column_register
+	display_write_data_register	data_register=\end_column_register, mode_is_already_set=yes, saveregs=\saveregs
+.endm
+
+.macro	display_set_start_row_and_end_row	start_row_register, end_row_register, saveregs=no
+	push	\end_row_register
+	push	\start_row_register
+	display_write_command_immediate	command=0x75, saveregs=\saveregs
+	pop	\start_row_register
+	display_write_data_register	data_register=\start_row_register, saveregs=\saveregs
+	pop	\end_row_register
+	display_write_data_register	data_register=\end_row_register, mode_is_already_set=yes, saveregs=\saveregs
+.endm
+
+.macro	display_set_master_current_from_register	master_current_register
+	push	\master_current_register
+	display_write_command_immediate	0xc7
+	@display_write_data_immediate	0x0f	@ set master current to maximum
+	pop	\master_current_register
+	display_write_data_register	\master_current_register	@ set master current
+.endm
+
+.macro	display_write_command_immediate	command, mode_is_already_set=no, saveregs=no
+	@ this macro takes 9 instructions to write a command to the display
+	@ original macro takes ~28?? instructions (112 bytes) to do the same thing
+	@ can make this 2 instructions shorter if we put d/c# as the 10th bit of the data bus
+	@ but then we need to OR every regular data bus value with the command or data high bit
+	@ which would take an extra 2 instructions per 18 bit display ram (so, 2 instructions/pixel)
+	@ so maybe that's less efficient
+	@ by switching to this new macro, we saved ~1000 bytes just for the commands written to the display
+	.ifc	\saveregs,yes
+		push	r0-r3
+	.endif
+	ldr r0,=PIOA
+	ldr	r1, =\command
+	str	r1, [r0, #Output_Data_Status_Register_offset]	@ load data bus with command
+	ldr	r1, =bit00
+	.ifc	\mode_is_already_set, no
+		mov	r2, r1, lsl #display_dc_port_a_bit
+	.endif
+	mov	r3, r1, lsl #display_cs_port_a_bit
+@	mov	r4, r1, lsl #display_wr_port_a_bit
+@	mov	r5, r1, lsl #display_cs_port_a_bit | display_wr_port_a_bit
+	.ifc	\mode_is_already_set, no
+		str	r2, [r0, #Clear_Output_Data_Register_offset]	@ activate command mode
+	.endif
+	str	r3, [r0, #Clear_Output_Data_Register_offset]	@ activate chip select
+@	str	r4, [r0, #Clear_Output_Data_Register_offset]	@ activate write
+@	str	r4, [r0, #Set_Output_Data_Register_offset]	@ deactivate write
+@	str	r5, [r0, #Set_Output_Data_Register_offset]	@ deactivate write and chip select
+	str	r3, [r0, #Set_Output_Data_Register_offset]	@ deactivate chip select
+	.ifc	\saveregs,yes
+		pop	r0-r3
+	.endif
+.endm
+
+.macro	display_write_data_immediate	data, mode_is_already_set=no, saveregs=no
+	.ifc	\saveregs,yes
+		push	r0-r3
+	.endif
+	ldr r0,=PIOA
+	ldr	r1, =\data
+	str	r1, [r0, #Output_Data_Status_Register_offset]	@ load data bus with command
+	ldr	r1, =bit00
+	.ifc	\mode_is_already_set, no
+		mov	r2, r1, lsl #display_dc_port_a_bit
+	.endif
+	mov	r3, r1, lsl #display_cs_port_a_bit
+@	mov	r4, r1, lsl #display_wr_port_a_bit
+@	mov	r5, r1, lsl #display_cs_port_a_bit | display_wr_port_a_bit
+	.ifc	\mode_is_already_set, no
+		str	r2, [r0, #Set_Output_Data_Register_offset]	@ activate data mode
+	.endif
+	str	r3, [r0, #Clear_Output_Data_Register_offset]	@ activate chip select
+@	str	r4, [r0, #Clear_Output_Data_Register_offset]	@ activate write
+@	str	r4, [r0, #Set_Output_Data_Register_offset]	@ deactivate write
+@	str	r4, [r0, #Clear_Output_Data_Register_offset]	@ activate write
+@	str	r5, [r0, #Set_Output_Data_Register_offset]	@ deactivate write and chip select
+	str	r3, [r0, #Set_Output_Data_Register_offset]	@ deactivate chip select
+	.ifc	\saveregs,yes
+		pop	r0-r3
+	.endif
+.endm
+
+.macro	display_write_data_register	data_register, mode_is_already_set=no, saveregs=no
+	.ifc	\saveregs,yes
+		push	r0-r3
+	.endif
+	mov	r1, \data_register
+	ldr r0, =PIOA
+	str	r1, [r0, #Output_Data_Status_Register_offset]	@ load data bus with data
+	ldr	r1, =bit00
+	.ifc	\mode_is_already_set, no
+		mov	r2, r1, lsl #display_dc_port_a_bit
+	.endif
+	mov	r3, r1, lsl #display_cs_port_a_bit
+@	mov	r4, r1, lsl #display_wr_port_a_bit
+@	mov	r5, r1, lsl #display_cs_port_a_bit | display_wr_port_a_bit
+@		mov	r5, r1, lsl #display_wr_port_a_bit
+@		add	r5, r5, r1, lsl #display_cs_port_a_bit
+	.ifc	\mode_is_already_set, no
+		str	r2, [r0, #Set_Output_Data_Register_offset]	@ activate data mode
+	.endif
+	str	r3, [r0, #Clear_Output_Data_Register_offset]	@ activate chip select
+@	str	r4, [r0, #Clear_Output_Data_Register_offset]	@ activate write
+@	str	r4, [r0, #Set_Output_Data_Register_offset]	@ deactivate write
+@	str	r4, [r0, #Clear_Output_Data_Register_offset]	@ activate write
+@	str	r5, [r0, #Set_Output_Data_Register_offset]	@ deactivate write and chip select
+	str	r3, [r0, #Set_Output_Data_Register_offset]	@ deactivate chip select
+	.ifc	\saveregs,yes
+		pop	r0-r3
+	.endif
+.endm
+
+.macro	display_switch_to_data_mode	saveregs=no
+	@ this takes 4 instructions
+	@ doing it inline takes only 2 instructions, but we do it every time
+	@ so we need to provide both kinds
+	@ elegant = using mode_is_already_set=no for the first d or c and then =yes for the rest
+	.ifc	\saveregs,yes
+		push	r0-r1
+	.endif
+	ldr r0, =PIOA
+	ldr	r1, =bit00
+	mov	r1, r1, lsl #display_dc_port_a_bit
+	str	r1, [r0, #Set_Output_Data_Register_offset]	@ activate data
+	.ifc	\saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	display_set_color_of_single_pixel	x_coordinate_register, y_coordinate_register, color_register
+	push	\color_register
+	push	\y_coordinate_register
+@	ldr	\y_coordinate_register, =1
+@	add	\y_coordinate_register, \y_coordinate_register, \x_coordinate_register
+@	display_set_start_column_and_end_column	start_column_register=\x_coordinate_register end_column_register=\y_coordinate_register
+	display_set_start_column_and_end_column	start_column_register=\x_coordinate_register end_column_register=\x_coordinate_register
+	pop	\y_coordinate_register
+@	ldr	\x_coordinate_register, =1
+@	add	\x_coordinate_register, \x_coordinate_register, \y_coordinate_register
+@	display_set_start_row_and_end_row	start_row_register=\x_coordinate_register end_row_register=\y_coordinate_register
+	display_set_start_row_and_end_row	start_row_register=\y_coordinate_register end_row_register=\y_coordinate_register
+	display_write_command_immediate	0x5c	@ all further data is display ram data
+	pop	\color_register
+	push	\color_register
+	mov	\color_register, \color_register, lsr #9
+@	ldr	\x_coordinate_register, =0xfffffffff
+@	and	\y_coordinate_register, \x_coordinate_register, \y_coordinate_register
+	display_write_data_register	\color_register
+	pop	\color_register
+	display_write_data_register	\color_register
+.endm
+
+.macro	reset__display_needs_update
+	push	r0-r1
+	ldr	r0, =display_needs_update
+	ldr	r1, =0
+	strb	r1, [r0]
+	pop	r0-r1
+.endm
+
+.macro	if_display_does_not_need_update_then_jump_to	address
+	push	r0
+	ldr	r0, =display_needs_update
+	ldrb	r0, [r0]
+	cmp	r0, #1
+	pop	r0
+	bNE	\address
+.endm
+
+.macro	change_display_mode_to_fill_rectangles_and_circles
+	display_write_command_immediate	0x92
+	display_write_data_immediate	0x01	@ fill rectangles and circles
+.endm
+
+.macro	change_display_mode_to_NOT_fill_rectangles_and_circles
+	display_write_command_immediate	0x92
+	display_write_data_immediate	0x0	@ don't fill rectangles and circles
+.endm
+
+.macro	write_image_to_screen	x=0, y=0, address
+	push	r0-r7
+	ldr	r0, =\address
+	ldrh	r2, [r0], #2	@ width
+	ldrh	r3, [r0], #2	@ height
+	sub	r2, r2, #1
+	sub	r3, r3, #1
+	mov	r1, r2	@ save width for later
+	ldr	r4, =\x	@ x offset
+	ldr	r5, =\y	@ y offset
+	add	r6, r4, r2
+	add	r7, r5, r3
+	display_set_start_column_and_end_column	start_column_register=r4, end_column_register=r6, saveregs=yes
+	display_set_start_row_and_end_row	start_row_register=r5, end_row_register=r7, saveregs=yes
+	display_write_command_immediate 0x5c, saveregs=yes	@ all further data is display ram data
+4:
+	mov	r2, r1
+5:
+		debug	r0
+	ldr	r4, [r0], #4
+	mov	r5, r4, lsr #9
+	display_write_data_register     data_register=r5, saveregs=yes
+	display_write_data_register     data_register=r4, saveregs=yes
+	dec	r2
+	bHS	5b
+	dec	r3
+	bHS	4b
+	pop	r0-r7
+.endm
+
+.macro	write_15_bit_packed_image_to_screen	x=0, y=0, address
+	push	r0-r11
+	ldr	r0, =\address
+	ldrh	r2, [r0], #2	@ width
+	ldrh	r3, [r0], #2	@ height
+	sub	r2, r2, #1
+	sub	r3, r3, #1
+	mov	r1, r2	@ save width for later
+	ldr	r4, =\x	@ x offset
+	ldr	r5, =\y	@ y offset
+	add	r6, r4, r2
+	add	r7, r5, r3
+	display_set_start_column_and_end_column	start_column_register=r4, end_column_register=r6, saveregs=yes
+	display_set_start_row_and_end_row	start_row_register=r5, end_row_register=r7, saveregs=yes
+	display_write_command_immediate 0x5c, saveregs=yes	@ all further data is display ram data
+	display_switch_to_data_mode	saveregs=yes
+	display_write_pixel_setup	color_register=r4, temporary_register_0=r8, temporary_register_1=r9, temporary_register_2=r10, temporary_register_3=r11
+4:
+	mov	r2, r1
+5:
+@		debug	r0
+	ldrh	r4, [r0], #2
+	mov	r5, r4
+	mov	r6, r4, lsr #5
+	mov	r7, r4, lsr #10
+	and	r5, r5, #0b11111
+	and	r6, r6, #0b11111
+@	and	r7, r7, #0b11111
+@	mov	r5, r5, lsl #1
+@	mov	r6, r6, lsl #1
+@	mov	r7, r7, lsl #1
+	ldr	r4, =0
+	add	r4, r4, r5, lsl #(1+0)
+	add	r4, r4, r6, lsl #(1+6)
+	add	r4, r4, r7, lsl #(1+12)
+	display_write_pixel	color_register=r4, temporary_register_0=r8, temporary_register_1=r9, temporary_register_2=r10, temporary_register_3=r11
+@	ldr	r4, =white
+@	write_pixel	color_register=r4
+@	mov	r5, r4, lsr #9
+@	display_write_data_register     data_register=r5, saveregs=yes
+@	display_write_data_register     data_register=r4, saveregs=yes
+	dec	r2
+	bHS	5b
+	dec	r3
+	bHS	4b
+	pop	r0-r11
+	.endm
+
+.macro	write_pixel	color_register
+	push	r0-r5
+	mov	r4, \color_register
+	mov	r5, r4, lsr #9
+	display_write_data_register     data_register=r5
+	display_write_data_register     data_register=r4
+	pop	r0-r5
+.endm
+
+.macro	display_write_pixel_setup	color_register, temporary_register_0, temporary_register_1, temporary_register_2, temporary_register_3
+	@ this is a quick inner-loop macro
+	@ all given registers are destroyed!
+	ldr \temporary_register_0, =PIOA
+	ldr	\temporary_register_1, =bit00
+	mov	\temporary_register_2, \temporary_register_1, lsl #display_cs_port_a_bit
+.endm
+
+.macro	display_write_pixel	color_register, temporary_register_0, temporary_register_1, temporary_register_2, temporary_register_3
+	@ this is a quick inner-loop macro
+	@ all given registers are destroyed!
+	mov	\temporary_register_3, \color_register, lsr #9
+	str	\temporary_register_3, [\temporary_register_0, #Output_Data_Status_Register_offset]	@ load data bus with data
+	str	\temporary_register_2, [\temporary_register_0, #Clear_Output_Data_Register_offset]	@ activate chip select
+	str	\temporary_register_2, [\temporary_register_0, #Set_Output_Data_Register_offset]	@ deactivate chip select
+	str	\color_register, [\temporary_register_0, #Output_Data_Status_Register_offset]	@ load data bus with data
+	str	\temporary_register_2, [\temporary_register_0, #Clear_Output_Data_Register_offset]	@ activate chip select
+	str	\temporary_register_2, [\temporary_register_0, #Set_Output_Data_Register_offset]	@ deactivate chip select
+.endm
+

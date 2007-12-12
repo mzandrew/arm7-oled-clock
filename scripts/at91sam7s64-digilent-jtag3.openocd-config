@@ -1,0 +1,63 @@
+#daemon configuration
+telnet_port 4444
+#gdb_port 3333
+
+#interface
+interface parport
+#parport_port 0x378
+#parport_cable wiggler
+parport_cable dlc5
+parport_port 0
+jtag_speed 0
+#use combined on interfaces or targets that can't set TRST/SRST separately
+#reset_config trst_and_srst srst_pulls_trst
+reset_config none
+
+#jtag scan chain
+#format L IRC IRCM IDCODE (Length, IR Capture, IR Capture Mask, IDCODE)
+jtag_device 4 0x1 0xf 0xe
+
+#jtag_nsrst_delay 333
+#jtag_ntrst_delay 333
+
+#target configuration
+daemon_startup reset
+#daemon_startup attach
+#target <type> <startup mode>
+#target arm7tdmi <reset mode> <chainpos> <endianness> <variant>
+#target arm7tdmi little run_and_halt 0 arm7tdmi-s_r4
+#target arm7tdmi little reset_run 0 arm7tdmi-s_r4
+target arm7tdmi little run_and_init 0 arm7tdmi-s_r4
+#target_script 0 reset h2294_init.script
+run_and_halt_time 0 30
+#working_area 0 0x40000000 0x40000 nobackup
+working_area 0 0x200000 0x1000 nobackup
+
+#flash configuration
+#flash bank lpc2000 0x0 0x40000 0 0 lpc2000_v1 0 14765 calc_checksum
+flash bank at91sam7 0 0 0 0 0
+#flash bank at91sam7 1048576 65536 4 4 0
+#flash bank at91sam7 1048576 65536 4 4 0
+#flash bank at91sam7 1048576 65536 4 4 0
+
+#flash bank at91sam7 0x100000 0x1000 4 4 0
+#flash bank at91sam7 0x101000 0x1000 4 4 0
+#flash bank at91sam7 0x102000 0x1000 4 4 0
+#flash bank at91sam7 0x103000 0x1000 4 4 0
+#flash bank at91sam7 0x104000 0x1000 4 4 0
+#flash bank at91sam7 0x105000 0x1000 4 4 0
+#flash bank at91sam7 0x106000 0x1000 4 4 0
+#flash bank at91sam7 0x107000 0x1000 4 4 0
+#flash bank at91sam7 0x108000 0x1000 4 4 0
+#flash bank at91sam7 0x109000 0x1000 4 4 0
+#flash bank at91sam7 0x10a000 0x1000 4 4 0
+#flash bank at91sam7 0x10b000 0x1000 4 4 0
+#flash bank at91sam7 0x10c000 0x1000 4 4 0
+#flash bank at91sam7 0x10d000 0x1000 4 4 0
+#flash bank at91sam7 0x10e000 0x1000 4 4 0
+#flash bank at91sam7 0x10f000 0x1000 4 4 0
+
+#flash bank cfi 0x80000000 0x400000 2 2 0
+
+#target_script 0 reset openocd.script
+

@@ -1,0 +1,125 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@ user-modifiable:
+
+.set	prototype, 1
+.set	use_rc_clock_only, 0
+.set	use_crystal, 0
+.set	use_external_oscillator, 1
+
+@ be careful here, or it'll crank the processor clock past 55MHz (see top of page 217 in pdf):
+.set	pll_multiplier, 7
+.set	log_base_2_of_pll_divisor, 4	@ 2^(this) = divisor
+@ pll frequency = main oscillator frequency / 2^(log_base_2_of_pll_divisor) * pll_multiplier
+
+.set	fixed_point_shift_by, 15
+.set	log_base_2_of_four_fifths_of_the_size_of_the_lookup_table, 8
+.set	maximum_n, 24
+@.set	maximum_n, 20
+
+.set	number_of_milliseconds_to_debounce_rotary_encoder, 8
+
+@ hardcoded:
+
+.if	prototype
+	.set	use_pll, 0
+	.set	rc_clock_frequency, 29962
+.else
+	.set	use_pll, 1
+@	.set	rc_clock_frequency, 29144
+@	.set	rc_clock_frequency, 29153
+	.set	rc_clock_frequency, 29163
+.endif
+
+.set	data_bus_port_a_bitmask, 0b111111111	@ bits PA0 to PA8 (a 9-bit interface)
+.set	display_reset_port_a_bit, 22
+.if	prototype
+.set	display_rd_port_a_bit, 27
+.set	display_wr_port_a_bit, 28
+.set	display_cs_port_a_bit, 29
+.set	display_dc_port_a_bit, 30
+.set	rotary_encoder_a_port_a_bit, 17
+.set	rotary_encoder_b_port_a_bit, 18
+.else
+.set	display_rd_port_a_bit, 30
+.set	display_wr_port_a_bit, 29
+.set	display_cs_port_a_bit, 28
+.set	display_dc_port_a_bit, 27
+.set	rotary_encoder_a_port_a_bit, 18
+.set	rotary_encoder_b_port_a_bit, 17
+.endif
+
+.set	general_purpose_output_a, 26
+.set	general_purpose_output_b, 21
+.set	general_purpose_output_c, 19
+
+.set	rotary_encoder_port_a_bitmask, 1<<rotary_encoder_a_port_a_bit + 1<<rotary_encoder_b_port_a_bit
+
+.set	button_c_port_a_bit, 31
+
+.set	spi_port_a_bitmask, 0b111100000000000
+
+.set	clock_block_size, 8
+
+.set	clock_face_mode_minimum, 0
+.set	clock_face_mode_maximum, 3	@ if you change this, be sure all vector tables have that many entries+1
+
+.set	rotary_encoder_mode_minimum, 1
+.set	rotary_encoder_mode_maximum, 1
+
+@ calculated:
+
+.set	size_of_sine_lookup_table_in_words, 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table
+.set	size_of_cosine_lookup_table_in_words, 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table
+.set	size_of_entire_lookup_table_in_words, 5<<(log_base_2_of_four_fifths_of_the_size_of_the_lookup_table-2)
+.set	beginning_of_sine_lookup_table, lookup_table
+.set	end_of_sine_lookup_table, beginning_of_sine_lookup_table+2*(size_of_sine_lookup_table_in_words-1)
+.set	beginning_of_cosine_lookup_table, just_after_end_of_lookup_table-2*(size_of_cosine_lookup_table_in_words-1)-2
+.set	end_of_cosine_lookup_table, beginning_of_cosine_lookup_table+2*(size_of_cosine_lookup_table_in_words-1)
+
+@.set	pi_fp, (314159 * 1<<fixed_point_shift_by) / 100000
+@.set	two_pi_fp, (628319 * 1<<fixed_point_shift_by) / 100000
+.ifeq	fixed_point_shift_by-11
+	.set	pi_fp, 6434
+	.set	two_pi_fp, 12868
+.endif
+.ifeq	fixed_point_shift_by-12
+	.set	pi_fp, 12868
+	.set	two_pi_fp, 25736
+.endif
+.ifeq	fixed_point_shift_by-13
+	.set	pi_fp, 25736
+	.set	two_pi_fp, 51472
+.endif
+.ifeq	fixed_point_shift_by-14
+	.set	pi_fp, 51472
+	.set	two_pi_fp, 102944
+.endif
+.ifeq	fixed_point_shift_by-15
+	.set	pi_fp, 102944
+	.set	two_pi_fp, 205887
+.endif
+
+@.set	hours_ratio_fp, 1<<fixed_point_shift_by * 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table / 12
+.set	hours_ratio_fp, 1<<fixed_point_shift_by * 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table / 720
+@.set	minutes_ratio_fp, 1<<fixed_point_shift_by * 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table / 60
+.set	minutes_ratio_fp, 1<<fixed_point_shift_by * 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table / 3600
+@.set	seconds_ratio_fp, 1<<fixed_point_shift_by * 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table / 60
+.set	seconds_ratio_fp, 1<<fixed_point_shift_by * 1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table / 600
+

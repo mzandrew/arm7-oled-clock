@@ -1,0 +1,396 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.align	4
+.text
+
+.ifc	asdf,asdfc
+generate_lookup_tables_32:
+	@ it's easier to generate sine and cosine at the same time
+	@ at 18.432 MHz and no PLL or divide scaling and FWS=0
+	@ this takes 1.99 ms for a table size of 128 each for sine and cosine
+	@ this takes 3.94 ms for a table size of 256 each for sine and cosine
+	@ this takes 7.86 ms for a table size of 512 each for sine and cosine
+	push	r0-r10
+	@ re-generate 1/n fixed_point table for n up to 20
+	@ this requires fixed_point_shift_by to be less than 16
+	@ldr	r0, =1
+	@ldr	r0, r0, lsl #(16-fixed_point_shift_by)
+	ldr	r0, =(16-fixed_point_shift_by)
+	ldr	r1, =maximum_n
+	ldr	r2, =one_over_n_fp_lookup_table
+0:	ldrh	r3, [r2]
+	cmp	r3, #0
+	ldrEQ	r3, =65536
+	@mul	r4, r3, r0
+	mov	r3, r3, lsr r0
+	strh	r3, [r2], #2
+	dec	r1
+	bHI	0b
+
+	@ generate sine and cosine lookup tables:
+@	ldr	r0, =size_of_lookup_table
+@	ldr	r0, =0xff00ff00	@ to compare against for pseudo-floating-point
+@	ldr	r0, =0x00100000	@ to compare against for pseudo-floating-point
+@	ldr	r0, =0xffffffff	@ to compare against for pseudo-floating-point
+	ldr	r1, =0	@ m = angle step (angle_step out of size_of_lookup_table)
+	ldr	r2, =two_pi_fp
+@	mov	r2, r2, lsl #1	@ 2 * pi_fp
+@	ldr	r3, =beginning_of_cosine_lookup_table
+	ldr	r4, =beginning_of_sine_lookup_table
+	@ r10 = one_over_n_fp_lookup_table
+	@ r11 = one_over_n_fp
+	ldr	r12, =maximum_n
+@	ldr	r0, =160
+next_angle_32:
+	ldr	r5, =1	@ current term; b_n = b_{n-1} * a*x / n (where a*x is the angle in radians), but first term is 1
+	mov	r5, r5, lsl #fixed_point_shift_by
+	mul	r6, r1, r2	@ angle (a*x) := 2*pi_fp * angle_step
+@	mul	r6, r0, r6
+@	mov	r6, r6, lsr #7
+@	@ r6 = 0.75 * angle
+@	mov	r6, r6, lsr #log_base_2_of_size_of_lookup_table @ angle :/= size_of_lookup_table
+	mov	r6, r6, lsr #log_base_2_of_four_fifths_of_the_size_of_the_lookup_table @ angle :/= size_of_lookup_table
+	ldr	r10, =one_over_n_fp_lookup_table
+	@sub	r6, r6, r2, lsr #1
+	@add	r6, r6, r2, lsr #1
+@.set	pseudo_floating_point_shift_by, fixed_point_shift_by>>2
+.set	pseudo_floating_point_shift_by, 2
+@	cmp	r1, #size_of_entire_lookup_table_in_words>>1
+@	cmp	r1, #size_of_entire_lookup_table_in_words*3/4
+@	movHS	r5, r5, lsr #pseudo_floating_point_shift_by
+@	cmp	r1, #size_of_entire_lookup_table_in_words*11/16
+@	movLO	r5, r5, lsl #pseudo_floating_point_shift_by
+@	cmp	r1, #size_of_entire_lookup_table_in_words*5/16
+@	movLO	r5, r5, lsr #pseudo_floating_point_shift_by
+.ifc	asdf,eho
+@	cmp	r1, #size_of_entire_lookup_table_in_words*3/4
+@	movHS	r5, r5, lsr #pseudo_floating_point_shift_by
+@	cmp	r1, #size_of_entire_lookup_table_in_words*7/8
+@	movHS	r5, r5, lsr #pseudo_floating_point_shift_by
+.endif
+@	cmp	r1, #size_of_entire_lookup_table_in_words*3/4
+0:	ldr	r7, =0	@ n
+	mov	r8, r5	@ running sum of cosine terms
+	ldr	r9, =0	@ running sum of sine terms
+n_1_5_9_13_17:	inc	r7
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r6, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r11, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x / n
+	add	r9, r9, r5	@ this term is part of the sine
+n_2_6_10_14_18:	inc	r7
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r6, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r11, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x / n
+@	sub	r8, r8, r5	@ this term is part of the cosine
+n_3_7_11_15_19:	inc	r7
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r6, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r11, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x / n
+	sub	r9, r9, r5	@ this term is part of the sine
+n_4_8_12_16_20:	inc	r7
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r6, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+@	cmp	r5, r0
+@	movHS	r5, r5, lsr #fixed_point_shift_by
+	mul	r5, r11, r5
+@	movLO	r5, r5, lsr #fixed_point_shift_by
+	mov	r5, r5, lsr #fixed_point_shift_by
+	@  b_n := b_{n-1} * a*x / n
+@	add	r8, r8, r5	@ this term is part of the cosine
+	cmp	r7, r12
+	bLO	n_1_5_9_13_17
+	
+@	cmp	r1, #size_of_entire_lookup_table_in_words*3/4
+@	movHS	r8, r8, lsl #pseudo_floating_point_shift_by
+@	movHS	r9, r9, lsl #pseudo_floating_point_shift_by
+@	cmp	r1, #size_of_entire_lookup_table_in_words*5/16
+@	movLO	r8, r8, lsl #pseudo_floating_point_shift_by
+@	movLO	r9, r9, lsl #pseudo_floating_point_shift_by
+@	cmp	r1, #size_of_entire_lookup_table_in_words*11/16
+@	movLO	r8, r8, lsr #pseudo_floating_point_shift_by
+@	movLO	r9, r9, lsr #pseudo_floating_point_shift_by
+
+@	strh	r8, [r3], #2
+	strh	r9, [r4], #2
+	inc	r1
+	ldr	r11, =size_of_entire_lookup_table_in_words
+	cmp	r1, r11
+	bLO	next_angle_32
+
+	pop	r0-r10
+	return
+.endif
+
+generate_lookup_tables_64:
+	@ it's easier to generate sine and cosine at the same time
+	@ at 18.432 MHz and no PLL or divide scaling and FWS=0
+	@ this takes 1.99 ms for a table size of 128 each for sine and cosine
+	@ this takes 3.94 ms for a table size of 256 each for sine and cosine
+	@ this takes 7.86 ms for a table size of 512 each for sine and cosine
+	push	r0-r10
+	@ re-generate 1/n fixed_point table for n up to 20
+	@ this requires fixed_point_shift_by to be less than 16
+	@ldr	r0, =1
+	@ldr	r0, r0, lsl #(16-fixed_point_shift_by)
+	ldr	r0, =(16-fixed_point_shift_by)
+	ldr	r1, =maximum_n
+	ldr	r2, =one_over_n_fp_lookup_table
+0:	ldrh	r3, [r2]
+	cmp	r3, #0
+	ldrEQ	r3, =65536
+	@mul	r4, r3, r0
+	mov	r3, r3, lsr r0
+	strh	r3, [r2], #2
+	dec	r1
+	bHI	0b
+
+	@ generate sine and cosine lookup tables:
+	ldr	r1, =0	@ m = angle step (angle_step out of size_of_lookup_table)
+	ldr	r2, =two_pi_fp
+@	ldr	r2, =pi_fp
+@	mov	r2, r2, lsl #1	@ 2 * pi_fp
+	ldr	r4, =beginning_of_sine_lookup_table
+	@ r10 = one_over_n_fp_lookup_table
+	@ r11 = one_over_n_fp
+	ldr	r12, =maximum_n
+@	ldr	r0, =0
+@	ldr	r3, =0
+@	ldr	r8, =0
+	ldr	r0, =(1<<fixed_point_shift_by)-1
+	@ r8 = the high part of the 64 bit result
+next_angle_64:
+	ldr	r5, =1	@ current term; b_n = b_{n-1} * a*x / n (where a*x is the angle in radians), but first term is 1
+	mov	r5, r5, lsl #fixed_point_shift_by
+	mul	r6, r1, r2	@ angle (a*x) := 2*pi_fp * angle_step
+	mov	r6, r6, lsr #log_base_2_of_four_fifths_of_the_size_of_the_lookup_table @ angle :/= size_of_lookup_table
+	ldr	r10, =one_over_n_fp_lookup_table
+0:	ldr	r7, =0	@ n
+	ldr	r9, =0	@ running sum of sine terms
+n_1_5_9_13_17_21:	inc	r7
+.macro	fixed_point_multiply	result_high_register, result_low_register, multiplicand_1_register, multiplicand_2_register, bitmask_register, temporary_register
+	smull	\result_low_register, \result_high_register, \multiplicand_1_register, \multiplicand_2_register
+	mov	\result_low_register, \result_low_register, lsr #fixed_point_shift_by
+	and	\temporary_register, \result_high_register, \bitmask_register
+	mov	\result_high_register, \result_high_register, lsr #fixed_point_shift_by
+	add	\result_low_register, \result_low_register, \temporary_register, lsl #(32-fixed_point_shift_by)
+.endm
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r6, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+@	smull	r5, r8, r6, r5
+@	mov	r5, r5, lsr #fixed_point_shift_by
+@	and	r3, r8, r0
+@	mov	r8, r8, lsr #fixed_point_shift_by
+@	add	r5, r5, r3, lsl #(32-fixed_point_shift_by)
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r11, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+	@  b_n := b_{n-1} * a*x / n
+	add	r9, r9, r5	@ this term is part of the sine
+n_2_6_10_14_18_22:	inc	r7
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r6, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r11, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+	@  b_n := b_{n-1} * a*x / n
+n_3_7_11_15_19_23:	inc	r7
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r6, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r11, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+	@  b_n := b_{n-1} * a*x / n
+	sub	r9, r9, r5	@ this term is part of the sine
+n_4_8_12_16_20_24:	inc	r7
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r6, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+	@  b_n := b_{n-1} * a*x
+	ldrh	r11, [r10], #2
+	fixed_point_multiply	result_high_register=r8, result_low_register=r5, multiplicand_1_register=r11, multiplicand_2_register=r5, bitmask_register=r0, temporary_register=r3
+	@  b_n := b_{n-1} * a*x / n
+	cmp	r7, r12
+	bLO	n_1_5_9_13_17_21
+
+@	strh	r9, [r4], #2
+
+	@ clamp the output to plus or minus 0x7fff
+	@ range is 0x8001 (negative 0x7fff) to 0x7fff (positive 0x7fff)
+	@ so 0x8000 is never used
+	ldr	r11, =0x7fff
+	movS	r9, r9
+	bPL	positive
+negative:
+	rsb	r3, r9, #0
+	cmp	r3, r11
+	bLO	gen64_done
+@		debug	r9
+@		debug	r3
+	mov	r9, r11
+	rsb	r9, r9, #0
+@		debug	r9
+	b	gen64_done
+positive:
+	cmp	r9, r11
+	movHI	r9, r11
+gen64_done:
+@	dec	r9	@ this is a fudge because 7fff is SO close to 8000
+@	dec	r9	@ this is a fudge because 7fff is SO close to 8000
+@	but that fucks up the minute hand when it's supposed to be =45 minutes
+
+	strh	r9, [r4], #2
+	inc	r1
+@	ldr	r11, =size_of_entire_lookup_table_in_words
+@	cmp	r1, r11
+	ldr	r11, =end_of_cosine_lookup_table
+	cmp	r4, r11
+	bLS	next_angle_64
+
+	pop	r0-r10
+	return
+
+.ifc	asdf,asdf
+show_lookup_table:
+@ ~1400 bytes
+	@ debug the sine/cosine lookup table generation:
+	push	r0-r12
+	ldr	r3, =beginning_of_sine_lookup_table
+@	ldr	r3, =beginning_of_cosine_lookup_table
+
+	mov	r11, r3
+@	ldr	r0, =64
+@	add	r11, r3, r0
+@	add	r11, r3, #64
+	ldr	r0, =0
+	ldr	r1, =64
+	ldr	r2, =4
+@	ldr	r9, =1
+@	mov	r9, r9, lsl #fixed_point_shift_by
+	ldr	r4, =blue
+	ldr	r6, =127
+	ldr	r7, =0
+	ldr	r10, =24
+	ldr	r8, =32
+	ldr	r12, =0xff000000
+7:	ldrsh	r5, [r11], #2
+	movS	r5, r5
+	rsbLT	r5, r5, #0
+	mul	r5, r10, r5
+	mov	r5, r5, lsr #fixed_point_shift_by
+	rsbLT	r5, r5, #0
+	sub	r5, r8, r5
+@	rsb	r5, r5, #0
+	tst	r5, r12
+	ldrNE	r5, =0
+	cmp	r5, r2
+	movLO	r5, r2
+	cmp	r5, r6
+	movHI	r5, r6
+	push	r0-r12
+	display_set_color_of_single_pixel	x_coordinate_register=r7, y_coordinate_register=r5, color_register=r4
+	pop	r0-r12
+	inc	r7
+	cmp	r7, r6
+	bLS	7b
+
+	mov	r11, r3
+@	ldr	r0, =64
+@	add	r11, r3, r0
+	ldr	r12, =end_of_sine_lookup_table
+@	add	r12, r12, #size_of_lookup_table
+	add	r12, r12, #2
+@	sub	r12, r12, #2
+@	ldr	r0, =160
+@	ldr	r1, =size_of_lookup_table
+@	mul	r2, r0, r1
+@	mov	r2, r2, lsr #7
+	@ r11 = beginning of lookup table
+	@ r12 = end of lookup table
+	ldr	r0, =0xff000000
+	ldr	r1, =64
+@	ldr	r1, =24
+	ldr	r2, =4
+@	ldr	r9, =1
+@	mov	r9, r9, lsl #fixed_point_shift_by
+	ldr	r4, =red
+	ldr	r10, =green
+	ldr	r6, =127
+	ldr	r7, =0
+	ldr	r8, =96
+8:	ldrsh	r5, [r11], #2
+	ldrsh	r3, [r12], #-2
+@	sub	r5, r5, r3
+	add	r5, r5, r3
+	movS	r5, r5
+	rsbLT	r5, r5, #0
+	mul	r5, r1, r5
+	mov	r5, r5, lsr #fixed_point_shift_by
+	rsbLT	r5, r5, #0
+	sub	r5, r8, r5
+	ldr	r0, =0xff000000
+	tst	r5, r0
+	ldrNE	r5, =0
+	cmp	r5, r2
+	movLO	r5, r2
+	cmp	r5, r6
+	movHI	r5, r6
+	push	r0-r12
+	display_set_color_of_single_pixel	x_coordinate_register=r7, y_coordinate_register=r8, color_register=r4
+	pop	r0-r12
+	push	r0-r12
+	display_set_color_of_single_pixel	x_coordinate_register=r7, y_coordinate_register=r5, color_register=r10
+	pop	r0-r12
+	inc	r7
+	cmp	r7, r6
+	bLS	8b
+
+	pop	r0-r12
+	return
+.endif
+

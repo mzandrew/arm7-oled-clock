@@ -1,0 +1,179 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.align	4
+.text
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+copy_raw_bcd_time_to_buffered_bcd_time:
+	push	r0-r3
+	@ wait until last spi transfer is complete:
+	ldr	r0, =SPI
+	ldr	r2, =bit00
+	mov	r2, r2, lsl #4
+0:	ldr	r1, [r0, #SPI_Status_Register_offset]
+	tst	r1, r2
+	bEQ	0b
+	@ copy raw time to buffered time:
+	ldr	r0, =clock_raw_bcd_seconds
+	ldr	r1, =clock_bcd_seconds
+	ldr	r2, =7
+1:	ldrb	r3, [r0], #1
+	strb	r3, [r1], #1
+	dec	r2
+	bHS	1b
+	ldr	r0, =clock_raw_bcd_hours_and_am_pm
+	ldr	r1, =clock_bcd_hours
+	ldrb	r3, [r0]
+	ldr	r2, =0b11111
+@		debug	r3
+	and	r3, r2, r3
+@		debug	r3
+	strb	r3, [r1]
+.ifc	care24,care284
+	@ junk to convert a 24 hour clock to a 12 hour clock:
+	@ first, convert the bcd hours to binary hours:
+	ldr	r2, =0xf
+	and	r0, r2, r3
+	mov	r3, r3, lsr #4
+	ldr	r2, =10
+	mla	r3, r2, r3, r0
+	@ check to see that it's past 11:59:
+	ldr	r0, =12
+	cmp	r3, r0
+	subHS	r3, r3, r0
+	@ now convert back to bcd:
+	ldr	r0, =0
+	cmp	r3, #10
+	subHS	r3, r3, #10
+	addHS	r0, r0, #0x10
+	cmp	r3, #10
+	subHS	r3, r3, #10
+	addHS	r0, r0, #0x10
+	add	r3, r0, r3
+	strb	r3, [r1]
+.endif
+@		debug	r3
+	pop	r0-r3
+	return
+
+copy_buffered_bcd_time_to_buffered_binary_time:
+	push	r0-r8
+	ldr	r0, =clock_bcd_seconds
+	ldr	r1, =clock_seconds
+	ldr	r2, =7
+	ldr	r3, =0xf
+	ldr	r7, =10
+1:	ldrb	r4, [r0], #1
+	and	r5, r3, r4
+	mov	r4, r4, lsr #4
+	mla	r6, r4, r7, r5
+	@ see if it's different from what it's about to overwrite:
+	ldrb	r8, [r1]
+	cmp	r6, r8
+	ldrNE	r8, =seconds_have_changed
+	strNEb	r7, [r8]
+	strb	r6, [r1], #1
+	dec	r2
+	bHS	1b
+	pop	r0-r8
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+read_rtc:
+	@ setup a dma transfer from the spi clock and keep a local copy of everything
+	push	r0-r4
+	ldr	r0, =SPI
+	ldr	r1, =get_clock_block
+	str	r1, [r0, #Receive_Pointer_Register_offset]
+	ldr	r2, =clock_block_size
+	str	r2, [r0, #Receive_Counter_Register_offset]
+	str	r2, [r0, #Transmit_Counter_Register_offset]
+@	ldr	r3, =address_of_spi_rtc_to_read_block
+	ldr	r3, =set_clock_block_read
+	str	r3, [r0, #Transmit_Pointer_Register_offset]
+	ldr	r4, =0x101
+	str	r4, [r0, #PDC_Transfer_Control_Register_offset]	@ start transmitting and receiving
+	pop	r0-r4
+	return
+	
+write_rtc:
+	@ setup a dma transfer to the spi clock
+	push	r0-r4
+	ldr	r0, =SPI
+	ldr	r1, =get_clock_block
+	str	r1, [r0, #Receive_Pointer_Register_offset]
+	ldr	r2, =clock_block_size
+	str	r2, [r0, #Receive_Counter_Register_offset]
+	str	r2, [r0, #Transmit_Counter_Register_offset]
+	ldr	r3, =set_clock_block_write
+	str	r3, [r0, #Transmit_Pointer_Register_offset]
+	ldr	r4, =0x101
+	str	r4, [r0, #PDC_Transfer_Control_Register_offset]	@ start transmitting and receiving
+	pop	r0-r4
+	return
+	
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+reset_tenths_of_seconds_timer_and_value_if_necessary:
+	push	r0-r1
+	ldr	r0, =seconds_have_changed
+	ldrb	r1, [r0]
+	cmp	r1, #10
+	bNE	seconds_are_the_same
+	mov	r1, #0
+	strb	r1, [r0]
+	reset_TC1	saveregs=yes
+	ldr	r0, =clock_tenths_of_seconds
+	ldr	r1, =0
+	strb	r1, [r0]
+@		turn_off_general_purpose_output	output=b, saveregs=yes
+@	delay_ms_imm	2, saveregs=yes
+@		wait_for_n_milliseconds	n=2, saveregs=yes
+@		turn_on_general_purpose_output	output=b, saveregs=yes
+seconds_are_the_same:
+	pop	r0-r1
+	return
+
+calculate_tenths_of_seconds:
+	push	r0-r2
+	ldr	r0, =TC1
+	ldr	r1, =number_of_TC1_clock_periods_in_one_tenth_of_a_second
+	ldr	r1, [r1]
+	ldr	r2, [r0, #TC_Counter_Value_Register_offset]
+@		debug_if_changed	r2
+	ldr	r0, =0
+another_tenth_of_a_second:
+@		turn_off_general_purpose_output	output=c, saveregs=yes
+@		turn_on_general_purpose_output	output=c, saveregs=yes
+	subS	r2, r2, r1
+	addHS	r0, r0, #1
+	bHS	another_tenth_of_a_second
+	ldr	r1, =clock_tenths_of_seconds
+	cmp	r0, #9
+	movHI	r0, #9
+	strb	r0, [r1]
+@		debug	r0
+@		debug_if_changed	r0
+	pop	r0-r2
+return
+	
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
