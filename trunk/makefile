@@ -59,48 +59,33 @@ all :
 	@if [ ! -d "work" ]; then mkdir "work"; fi
 #	$(foreach each,$(list_of_assembly_language_files),$(MAKE) $(each:src/%.s=work/%.o);)
 #	$(foreach each,$(list_of_c_language_files),$(MAKE) $(each:src/%.c=work/%.o);)
-	$(MAKE) work/test.armasm
-#	$(MAKE) work/interrupt-vector-table.o
+#	$(MAKE) work/test.armasm
+	$(MAKE) work/exception-handler-vector-table.o
 	$(MAKE) work/arm7-oled-clock.hex
 #	$(MAKE) work/test.hex
-	@echo
-	@echo "all targets up to date"
-	@echo
 
-dependencies = src/arm7-oled-clock.armasm, src/arm7-oled-clock.bss, src/arm7-oled-clock.data, src/arm7-oled-clock.equates, src/arm7-oled-clock.functions, src/arm7-oled-clock.macros, src/at91sam7s.equates, src/exception-handler-vector-table.armasm, src/font.functions, src/font.lookup-table, src/generic.equates, src/generic.macros, src/initialization.macros, src/io-pin.functions, src/io-pin.macros, src/math.functions, src/math.macros, src/oled-display.equates, src/oled-display.functions, src/oled-display.macros, src/spi-rtc.functions, src/test.c
+dependencies = src/arm7-oled-clock.armasm src/arm7-oled-clock.bss src/arm7-oled-clock.data src/arm7-oled-clock.equates src/arm7-oled-clock.functions src/arm7-oled-clock.macros src/at91sam7s.equates src/exception-handler-vector-table.armasm src/font.functions src/font.lookup-table src/generic.equates src/generic.macros src/initialization.macros src/io-pin.functions src/io-pin.macros src/math.functions src/math.macros src/oled-display.equates src/oled-display.functions src/oled-display.macros src/spi-rtc.functions src/test.c
 
 work/%.o : src/%.armasm $(dependencies) ;
 	$(assembler) $(assembly_flags) -a=$(@:work/%.o=work/%.listing) $< -o $@
-	@echo "assembly stage complete"
-	@echo
 
 work/%.o : src/%.s ;
 	$(assembler) $(assembly_flags) -a=$(@:work/%.o=work/%.listing)  $< -o $@
-	@echo "assembly stage complete"
-	@echo
 
 work/%.o : work/%.armasm ;
 	$(assembler) $(assembly_flags) -a=$(@:work/%.o=work/%.listing)  $< -o $@
-	@echo "assembly stage complete"
-	@echo
 
 work/%.armasm : src/%.c ;
 	$(c_compiler) $(c_compiler_flags) $< -o $@
-	@echo "compiler stage complete"
-	@echo
 
 #work/blink-led.elf : work/blink-led.o work/test.o ;
 #	$(linker) $(linker_flags) $< -o $@
 
 work/arm7-oled-clock.elf : $(all_object_files_that_need_to_be_generated) ;
 	$(linker) $(linker_flags) $^ -o $@
-	@echo "linking stage complete"
-	@echo
 
 work/%.hex : work/%.elf ;
 	$(elf_to_hex) $(elf_to_hex_flags) $< $@
-	@echo "conversion to .hex stage complete"
-	@echo
 
 program : work/arm7-oled-clock.hex ;
 	openocd --file=scripts/at91sam7s64-digilent-jtag3-upload-to-flash.openocd-config 

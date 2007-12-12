@@ -1,3 +1,4 @@
+/*
 # copyright 2007 mza (Matthew Andrew)
 # started 2007-09-19 (talk like a pirate day)
 
@@ -15,6 +16,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
 # or visit http://www.fsf.org/
+*/
 
 ENTRY(reset_vector)
 

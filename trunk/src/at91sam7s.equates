@@ -19,7 +19,8 @@
 @ these are for the at91sam7s64:
 
 @ my definition of "top" is the highest address; atmel's and arm's might be different
-.set	top_of_sram, 0x00300000-1
+@.set	top_of_sram, 0x00300000-1
+.set	top_of_sram, 0x00204000-1
 .set	top_of_stack, top_of_sram-3	@ the 3 is to align it to a 4 byte boundary
 
 @ these are for the at91sam7s:
