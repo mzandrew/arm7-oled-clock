@@ -1,0 +1,129 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	turn_on_led	saveregs=no
+	turn_off_port_a_bit	#8, saveregs=\saveregs
+.endm
+
+.macro	turn_off_led	saveregs=no
+	turn_on_port_a_bit	#8, saveregs=\saveregs
+.endm
+
+@.macro	display_activate_signal	signal, saveregs=no
+@.macro	display_deactivate_signal	signal, saveregs=no
+
+.macro	load_register_with_bit	register, bit_imm, saveregs=no
+	.ifc	\register, r0
+		.ifc	\saveregs,yes
+			push	r1
+		.endif
+@		ldr	\register, =0
+		ldr	r1, =bit00
+		mov	\register, r1, lsl #\bit_imm
+		.ifc	\saveregs,yes
+			pop	r1
+		.endif
+	.else
+		.ifc	\saveregs,yes
+			push	r0
+		.endif
+@		ldr	\register, =0
+		ldr	r0, =bit00
+		mov	\register, r0, lsl #\bit_imm
+		.ifc	\saveregs,yes
+			pop	r0
+		.endif
+	.endif
+.endm
+
+@ worry about saveregs here - enable it for the ones that'll get used directly
+
+.macro	display_pulse_read
+	display_activate_read
+	display_deactivate_read
+.endm
+
+.macro	display_pulse_write
+	display_activate_write
+	display_deactivate_write
+.endm
+
+.macro	display_pulse_chip_select
+	display_activate_chip_select
+	display_deactivate_chip_select
+.endm
+
+.macro	display_pulse_reset
+	display_activate_reset
+	display_deactivate_reset
+.endm
+
+.macro	display_activate_read, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_rd_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Clear_Output_Data_Register_offset
+.endm
+
+.macro	display_activate_write, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_wr_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Clear_Output_Data_Register_offset
+.endm
+
+.macro	display_activate_chip_select, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_cs_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Clear_Output_Data_Register_offset
+.endm
+
+.macro	display_activate_data, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_dc_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Set_Output_Data_Register_offset
+.endm
+
+.macro	display_activate_command, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_dc_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Clear_Output_Data_Register_offset
+.endm
+
+.macro	display_activate_reset, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_reset_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Clear_Output_Data_Register_offset
+.endm
+
+.macro	display_deactivate_read, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_rd_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Set_Output_Data_Register_offset
+.endm
+
+.macro	display_deactivate_write, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_wr_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Set_Output_Data_Register_offset
+.endm
+
+.macro	display_deactivate_chip_select, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_cs_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Set_Output_Data_Register_offset
+.endm
+
+.macro	display_deactivate_reset, saveregs=no
+	load_register_with_bit	register=r0, bit_imm=display_reset_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Set_Output_Data_Register_offset
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+

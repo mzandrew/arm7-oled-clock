@@ -1,0 +1,366 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+@.macro	set_bit_in_parallel_io_port_a_controller_register	bit:req, address_offset:req
+
+.macro	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register, address_offset, saveregs=no
+	set_bitmask_in_system_controller_register	bitmask_register=\bitmask_register, address_base=PIOA, address_offset=\address_offset, saveregs=\saveregs
+.endm
+
+.macro	set_bit_in_parallel_io_port_a_controller_register	bit, address_offset, saveregs=no
+	set_bit_in_system_controller_register	bit=\bit, address_base=PIOA, address_offset=\address_offset, saveregs=\saveregs
+.endm
+
+.macro set_bit_in_output_register_for_port_a	bit, saveregs=no
+	set_bit_in_parallel_io_port_a_controller_register	bit=\bit, address_offset=Set_Output_Data_Register_offset, saveregs=\saveregs
+.endm
+
+.macro clear_bit_in_output_register_for_port_a	bit, saveregs=no
+	set_bit_in_parallel_io_port_a_controller_register	bit=\bit, address_offset=Clear_Output_Data_Register_offset, saveregs=\saveregs
+.endm
+
+.macro	turn_on_port_a_bit	bit, saveregs=no
+	set_bit_in_output_register_for_port_a	bit=\bit, saveregs=\saveregs
+.endm
+
+.macro	turn_off_port_a_bit	bit, saveregs=no
+	clear_bit_in_output_register_for_port_a	bit=\bit, saveregs=\saveregs
+.endm
+
+.macro	pulse_port_a_bit_off_and_on	bit, saveregs=no
+	.ifc \saveregs,yes
+		push	r0-r1
+	.endif
+	turn_off_port_a_bit	bit=\bit, saveregs=no	@ this assumes turn_off and turn_on macros only use r0 and r1
+	turn_on_port_a_bit	bit=\bit, saveregs=no
+	.ifc \saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	pulse_port_a_bit_on_and_off	bit, saveregs=no
+	.ifc \saveregs,yes
+		push	r0-r1
+	.endif
+	turn_on_port_a_bit	bit=\bit, saveregs=no	@ this assumes turn_off and turn_on macros only use r0 and r1
+	turn_off_port_a_bit	bit=\bit, saveregs=no
+	.ifc \saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	pulse_general_purpose_output	output, saveregs=no
+	.ifc	saveregs,yes
+		push	r0-r1
+	.endif
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	.ifc	\output,a
+		mov	r1, r1, lsl #general_purpose_output_a
+	.endif
+	.ifc	\output,b
+		mov	r1, r1, lsl #general_purpose_output_b
+	.endif
+	.ifc	\output,c
+		mov	r1, r1, lsl #general_purpose_output_c
+	.endif
+@	.else
+@		mov	r1, r1, lsl #general_purpose_output_a
+@		.warning "not supposed to get here"
+@		.error
+@	.endif
+	str	r1, [r0, #Clear_Output_Data_Register_offset]
+	str	r1, [r0, #Set_Output_Data_Register_offset]
+	.ifc	saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	turn_on_general_purpose_output	output, saveregs=no
+	.ifc	\saveregs,yes
+		push	r0-r1
+	.endif
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	.ifc	\output,a
+		mov	r1, r1, lsl #general_purpose_output_a
+	.endif
+	.ifc	\output,b
+		mov	r1, r1, lsl #general_purpose_output_b
+	.endif
+	.ifc	\output,c
+		mov	r1, r1, lsl #general_purpose_output_c
+	.endif
+@	.else
+@		mov	r1, r1, lsl #general_purpose_output_a
+@		.warning "not supposed to get here"
+@		.error
+@	.endif
+@	str	r1, [r0, #Clear_Output_Data_Register_offset]
+	str	r1, [r0, #Set_Output_Data_Register_offset]
+	.ifc	\saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	turn_off_general_purpose_output	output, saveregs=no
+	.ifc	\saveregs,yes
+		push	r0-r1
+	.endif
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	.ifc	\output,a
+		mov	r1, r1, lsl #general_purpose_output_a
+	.endif
+	.ifc	\output,b
+		mov	r1, r1, lsl #general_purpose_output_b
+	.endif
+	.ifc	\output,c
+		mov	r1, r1, lsl #general_purpose_output_c
+	.endif
+@	.else
+@		mov	r1, r1, lsl #general_purpose_output_a
+@		.warning "not supposed to get here"
+@		.error
+@	.endif
+	str	r1, [r0, #Clear_Output_Data_Register_offset]
+@	str	r1, [r0, #Set_Output_Data_Register_offset]
+	.ifc	\saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	store_register_in_data_bus	register, saveregs=no
+	store_register_in_base_plus_offset_address	\register, PIOA, Output_Data_Status_Register_offset, saveregs
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	adc_start_conversion	channel, saveregs=no
+	.ifc \saveregs,yes
+		push	r0-r1
+	.endif
+	ldr	r0, =0b10	@ bit01 is adc start conversion
+	ldr	r1, =ADC
+	str	r0, [r1, #ADC_Control_Register_offset]
+	.ifc \saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	wait_for_adc_channel	channel, saveregs=no
+	.ifc \saveregs,yes
+		push	r0-r2
+		push_flags_through	r0
+	.endif
+	ldr	r0, =ADC
+	ldr	r2, =bit00
+	mov	r2, r2, lsl #\channel
+0:
+	ldr	r1, [r0, #ADC_Status_Register_offset]
+	tst	r1, r2
+	bEQ	0b
+	.ifc \saveregs,yes
+		pop_flags_through	r0
+		pop	r0-r2
+	.endif
+.endm
+
+.macro	load_adc_channel	channel, destination_register=r0, saveregs=no
+	@ this alters \destination_register
+	.ifc \saveregs,yes
+		push	r0-r2
+	.endif
+	ldr	r1, =4
+	ldr	r2, =\channel
+	mul	r0, r1, r2
+	add	r1, r0, #ADC_Channel_Data_Register_0_offset
+	ldr	r0, =ADC
+	.ifc \saveregs,yes
+		ldr	r2, [r0, r1]
+		push	r2
+		pop	r0-r2
+		.error	"this section is wrong"
+	.else
+		ldr	\destination_register, [r0, r1]
+	.endif
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	check_rotary_encoder_status
+0:
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	mov	r2, r1, lsl #rotary_encoder_a_port_a_bit
+	mov	r3, r1, lsl #rotary_encoder_b_port_a_bit
+@	rotary_encoder_port_a_bitmask
+	ldr	r4, [r0, #PIO_Controller_Pin_Data_Status_Register_offset]
+	tst	r4, r2
+	ldr	r2, =0
+	addNE	r2, r2, r1
+	mov	r1, r1, lsl #1
+	tst	r4, r3
+	addNE	r2, r2, r1
+
+@	mov	r4, r2, lsr #rotary_encoder_a_port_a_bit
+@	add	r4, r4, r3, lsr #rotary_encoder_b_port_a_bit
+	ldr	r0, =rotary_encoder_previous_position
+	ldr	r1, =rotary_encoder_current_position
+	ldrb	r3, [r1]
+	cmp	r2, r3
+	bEQ	rotary_encoder_still_the_same
+	strb	r2, [r1]
+	strb	r3, [r0]
+
+@	debug_if_changed	r2
+
+	wait_for_n_milliseconds	n=number_of_milliseconds_to_debounce_rotary_encoder
+
+@	ldr	r0, =rotary_encoder_signed_delta_unstable
+	ldr	r1, =rotary_encoder_previous_position
+	ldr	r2, =rotary_encoder_current_position
+	ldrb	r1, [r1]
+	ldrb	r2, [r2]
+@	rgb=clockwise=increase; 01 00 10 11 01 00 10 11 = 1 0 2 3 1 0 2 3
+	cmp	r1, #0b01
+	bEQ	check_rotary_encoder_status_01
+	cmp	r1, #0b00
+	bEQ	check_rotary_encoder_status_00
+	cmp	r1, #0b10
+	bEQ	check_rotary_encoder_status_10
+	cmp	r1, #0b11
+	bEQ	check_rotary_encoder_status_11
+check_rotary_encoder_status_01:
+	cmp	r2, #0b00
+@	bEQ	check_rotary_encoder_status_increase
+	cmp	r2, #0b11
+@	bEQ	check_rotary_encoder_status_decrease
+	b	check_rotary_encoder_status_null
+check_rotary_encoder_status_00:
+	cmp	r2, #0b10
+@	bEQ	check_rotary_encoder_status_increase
+	cmp	r2, #0b01
+@	bEQ	check_rotary_encoder_status_decrease
+	b	check_rotary_encoder_status_null
+check_rotary_encoder_status_10:
+	cmp	r2, #0b11
+@	bEQ	check_rotary_encoder_status_increase
+	cmp	r2, #0b00
+@	bEQ	check_rotary_encoder_status_decrease
+	b	check_rotary_encoder_status_null
+check_rotary_encoder_status_11:
+	cmp	r2, #0b01
+	bEQ	check_rotary_encoder_status_decrease
+	cmp	r2, #0b10
+	bEQ	check_rotary_encoder_status_increase
+	b	check_rotary_encoder_status_error
+check_rotary_encoder_status_error:
+	wait_for_n_milliseconds	n=number_of_milliseconds_to_debounce_rotary_encoder
+	b	0b
+@	ldr	r1, =3
+@	b	check_rotary_encoder_status_change
+check_rotary_encoder_status_null:
+	ldr	r1, =0
+	b	check_rotary_encoder_status_change
+check_rotary_encoder_status_decrease:
+	ldr	r1, =-1
+	b	check_rotary_encoder_status_change
+check_rotary_encoder_status_increase:
+	ldr	r1, =1
+check_rotary_encoder_status_change:
+	ldr	r0, =rotary_encoder_signed_delta_stable
+	ldr	r2, =rotary_encoder_signed_delta_stable_previous_increase_or_decrease
+@	ldrsb	r3, [r2]
+	strb	r1, [r0]
+	cmp	r1, #0
+	strNEb	r1, [r2]
+rotary_encoder_still_the_same:
+.endm
+
+.macro	show_rotary_encoder_status_test_mode
+	ldr	r0, =rotary_encoder_current_position
+	ldr	r0, [r0]
+	ldr	r1, =yellow
+	ldr	r2, =rotary_encoder_signed_delta_stable_previous_increase_or_decrease
+	ldrsb	r2, [r2]
+	cmp	r2, #0
+	ldrGT	r1, =purple
+	ldrLT	r1, =orange
+	cmp	r0, #0b01
+	ldrEQ	r1, =red
+	cmp	r0, #0b00
+	ldrEQ	r1, =green
+	cmp	r0, #0b10
+	ldrEQ	r1, =blue
+@	cmp	r0, #0b11
+@	ldrEQ	r1, =white
+	ldr	r0, =rotary_encoder_value
+	ldrb	r0, [r0]
+	ldr	r2, =5
+	display_set_color_of_single_pixel	x_coordinate_register=r2, y_coordinate_register=r0, color_register=r1
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	affect_rotary_encoder_change_test_mode
+	ldr	r3, =rotary_encoder_signed_delta_stable
+	ldrsb	r1, [r3]
+	ldr	r0, =rotary_encoder_value
+	ldrb	r2, [r0]
+	keep_it_between_signed	min=0, it=r2, max=123
+@	keep_it_between_signed_ping_pong	min=0, it=r2, max=123
+@	strb	r2, [r0]
+	add	r1, r1, r2
+	keep_it_between_signed	min=0, it=r1, max=123
+@	keep_it_between_signed_ping_pong	min=0, it=r1, max=123
+	strb	r1, [r0]
+@		debug_if_changed	r1
+	ldr	r0, =0
+	strb	r0, [r3]
+.endm
+
+.macro	affect_rotary_encoder_change_clock_face_mode
+	ldr	r3, =rotary_encoder_signed_delta_stable
+	ldrsb	r1, [r3]
+	cmp	r1, #0
+	bEQ	affect_rotary_encoder_change_clock_face_mode_done
+@	ldr	r0, =rotary_encoder_value
+	ldr	r0, =clock_face_mode
+	ldrb	r2, [r0]
+	keep_it_between_signed	min=clock_face_mode_minimum, it=r2, max=clock_face_mode_maximum
+@	keep_it_between_unsigned	min=clock_face_mode_minimum, it=r2, max=clock_face_mode_maximum
+@	strb	r2, [r0]
+	add	r1, r1, r2
+	keep_it_between_signed	min=clock_face_mode_minimum, it=r1, max=clock_face_mode_maximum
+@	keep_it_between_unsigned	min=clock_face_mode_minimum, it=r1, max=clock_face_mode_maximum
+	strb	r1, [r0]
+@		debug_if_changed	r1
+	ldr	r0, =0
+	strb	r0, [r3]
+	call	prepare_screen_for_drawing_on_it
+	ldr	r0, =display_needs_redrawing
+	ldr	r1, =1
+	strb	r1, [r0]
+affect_rotary_encoder_change_clock_face_mode_done:
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+

@@ -1,0 +1,78 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.align	4
+.text
+
+draw_a_number:
+	push	r0-r9
+	ldr	r0, =position_of_center_of_current_character_x
+	ldrb	r0, [r0]
+	sub	r0, r0, #character_width>>1
+	add	r1, r0, #character_width
+	dec	r1
+	display_set_start_column_and_end_column	start_column_register=r0, end_column_register=r1
+
+	ldr	r0, =position_of_center_of_current_character_y
+	ldrb	r0, [r0]
+	sub	r0, r0, #character_height>>1
+	add	r1, r0, #character_height
+	dec	r1
+	display_set_start_row_and_end_row	start_row_register=r0, end_row_register=r1
+
+	display_write_command_immediate	0x5c	@ all further data is display ram data
+
+	ldr	r0, =font_color
+	ldr	r0, [r0]
+	mov	r1, r0, lsr #9
+	ldr	r8, =background_color
+	ldr	r8, [r8]
+	mov	r9, r8, lsr #9
+
+	ldr	r2, =current_character
+	ldrb	r2, [r2]
+	sub	r2, r2, #48
+	ldr	r3, =zero
+	ldr	r4, =5*7
+	mla	r2, r4, r2, r3
+@	add	r2, r2, r3
+
+	ldr	r4, =font_null
+	ldr	r5, =character_height
+font_row:
+	ldr	r6, =character_width
+font_pixel:
+	ldrb	r7, [r2], #1
+	cmp	r4, r7
+	bNE	font_set_pixel
+font_clear_pixel:
+	display_write_data_register	r9, saveregs=yes
+	display_write_data_register	r8, saveregs=yes
+	b	font_next_pixel
+font_set_pixel:
+	display_write_data_register	r1, saveregs=yes
+	display_write_data_register	r0, saveregs=yes
+font_next_pixel:
+	dec	r6
+	bHI	font_pixel
+	dec	r5
+	bHI	font_row
+
+	pop	r0-r9
+	return
+

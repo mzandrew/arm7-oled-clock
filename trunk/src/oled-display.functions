@@ -1,0 +1,1087 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.align	4
+.text
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+draw_a_circle:
+	push	r0-r3
+	ldr	r0, =x_position_of_center_of_circle
+	ldrb	r0, [r0]
+	ldr	r1, =y_position_of_center_of_circle
+	ldrb	r1, [r1]
+	ldr	r3, =color
+	ldr	r3, [r3]
+	ldr	r2, =radius_of_circle
+	ldrb	r2, [r2]
+@	mov	r2, r2, lsl #1
+	draw_circle	center_x_register=r0, center_y_register=r1, radius_register=r2, line_color_register=r3, fill_color_register=r3
+	pop	r0-r3
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	swap_registers	register_1, register_2
+	push	\register_1
+	mov	\register_1, \register_2
+	pop	\register_2
+.endm
+
+.pool
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+draw_a_line_with_slope_magnitude_equal_to_one:
+	push	r0-r7
+	@ draw from left to right
+	ldr	r0, =position_of_beginning_of_line_x
+	ldr	r1, =position_of_beginning_of_line_y
+	ldr	r2, =position_of_end_of_line_x
+	ldr	r3, =position_of_end_of_line_y
+	ldrb	r0, [r0]
+	ldrb	r1, [r1]
+	ldrb	r2, [r2]
+	ldrb	r3, [r3]
+	cmp	r0, r2
+	bLO	draw_a_line_with_slope_magnitude_equal_to_one_0
+	swap_registers	r0, r2
+	swap_registers	r1, r3
+draw_a_line_with_slope_magnitude_equal_to_one_0:
+	@ at this point, r0 is less than r2 and r0 still corresponds to r1 (ditto r2 & r3)
+	ldr	r4, =line_color
+	ldr	r4, [r4]
+	mov	r5, r4, lsr #9
+	sub	r6, r2, r0
+	sub	r7, r3, r1
+@ bug/future:  check that |r6|=|r7| or bust
+
+draw_a_line_with_slope_magnitude_equal_to_one_next:
+
+	display_set_start_column_and_end_column	start_column_register=r0, end_column_register=r0, saveregs=yes
+	display_set_start_row_and_end_row	start_row_register=r1, end_row_register=r1, saveregs=yes
+	display_write_command_immediate	command=0x5c, saveregs=yes	@ all further data is display ram data
+	display_write_data_register	data_register=r5, saveregs=yes
+	display_write_data_register	data_register=r4, saveregs=yes
+
+	add	r0, r0, #1
+	cmp	r7, #0
+	addGT	r1, r1, #1
+	subLT	r1, r1, #1
+	cmp	r0, r2
+	bLO	draw_a_line_with_slope_magnitude_equal_to_one_next
+
+	pop	r0-r7
+	return
+
+.ifc	asdf,aheto
+draw_a_line_with_slope_magnitude_less_than_one:
+@ NOT FINISHED!
+	push	r0-r7
+	@ draw from left to right
+	ldr	r0, =position_of_beginning_of_line_x
+	ldr	r1, =position_of_beginning_of_line_y
+	ldr	r2, =position_of_end_of_line_x
+	ldr	r3, =position_of_end_of_line_y
+	ldrb	r0, [r0]
+	ldrb	r1, [r1]
+	ldrb	r2, [r2]
+	ldrb	r3, [r3]
+	cmp	r0, r2
+	bLO	draw_a_line_with_slope_magnitude_less_than_one_0
+	swap_registers	r0, r2
+	swap_registers	r1, r3
+draw_a_line_with_slope_magnitude_less_than_one_0:
+	@ at this point, r0 is less than r2 and r0 still corresponds to r1 (ditto r2 & r3)
+	ldr	r4, =line_color
+	ldr	r4, [r4]
+	mov	r5, r4, lsr #9
+	sub	r6, r2, r0
+	sub	r7, r3, r1
+@	ldr	r8, =
+
+draw_a_line_with_slope_magnitude_less_than_one_next:
+
+	display_set_start_column_and_end_column	start_column_register=r0, end_column_register=r0, saveregs=yes
+	display_set_start_row_and_end_row	start_row_register=r1, end_row_register=r1, saveregs=yes
+	display_write_command_immediate	command=0x5c, saveregs=yes	@ all further data is display ram data
+	display_write_data_register	data_register=r5, saveregs=yes
+	display_write_data_register	data_register=r4, saveregs=yes
+
+	add	r0, r0, #1
+	cmp	r7, #0
+	addGT	r1, r1, #1
+	subLT	r1, r1, #1
+	cmp	r0, r2
+	bLO	draw_a_line_with_slope_magnitude_less_than_one_next
+
+	pop	r0-r7
+	return
+.endif
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+erase_hour_hand_if_necessary:
+	push	r0-r10
+@	change_display_mode_to_NOT_fill_rectangles_and_circles
+	ldr	r0, =hand_width
+	ldr	r1, =hour_hand_width
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r0, =current_x_position_of_end_of_hour_hand
+	ldr	r1, =current_y_position_of_end_of_hour_hand
+	ldr	r2, =current_x_position_of_end_of_hand
+	ldr	r3, =current_y_position_of_end_of_hand
+	ldr	r4, =old_x_position_of_end_of_hour_hand
+	ldr	r5, =old_y_position_of_end_of_hour_hand
+	ldr	r9, =background_color
+	ldr	r9, [r9]
+	call	erase_something_hand
+@	change_display_mode_to_fill_rectangles_and_circles
+	pop	r0-r10
+	return
+
+erase_minute_hand_if_necessary:
+	push	r0-r10
+	ldr	r0, =hand_width
+	ldr	r1, =minute_hand_width
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r0, =current_x_position_of_end_of_minute_hand
+	ldr	r1, =current_y_position_of_end_of_minute_hand
+	ldr	r2, =current_x_position_of_end_of_hand
+	ldr	r3, =current_y_position_of_end_of_hand
+	ldr	r4, =old_x_position_of_end_of_minute_hand
+	ldr	r5, =old_y_position_of_end_of_minute_hand
+	ldr	r9, =background_color
+	ldr	r9, [r9]
+	call	erase_something_hand
+	pop	r0-r10
+	return
+
+erase_second_hand_if_necessary:
+	push	r0-r10
+	ldr	r0, =hand_width
+	ldr	r1, =second_hand_width
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r0, =current_x_position_of_end_of_second_hand
+	ldr	r1, =current_y_position_of_end_of_second_hand
+	ldr	r2, =current_x_position_of_end_of_hand
+	ldr	r3, =current_y_position_of_end_of_hand
+	ldr	r4, =old_x_position_of_end_of_second_hand
+	ldr	r5, =old_y_position_of_end_of_second_hand
+	ldr	r9, =background_color
+	ldr	r9, [r9]
+	call	erase_something_hand
+	pop	r0-r10
+	return
+
+erase_something_hand:
+	ldrb	r0, [r0]
+	ldrb	r1, [r1]
+	@ r0 = current x position (source)
+	@ r1 = current y position (source)
+	@ r2 = address of x position of hand to be drawn (destination)
+	@ r3 = address of y position of hand to be drawn (destination)
+	@ r4 = address of old x position (comparison)
+	@ r5 = address of old y position (comparison)
+	@ r6 = x position of hand to be drawn (destination)
+	@ r7 = y position of hand to be drawn (destination)
+	@ r8 = address of color
+	@ r9 = color
+	@ r10 = whether this is the first time drawing
+	ldrb	r6, [r4]
+	ldrb	r7, [r5]
+	cmp	r0, r6
+	cmpEQ	r1, r7
+	bEQ	erase_something_hand_done
+		pulse_general_purpose_output	output=a, saveregs=yes
+	ldr	r8, =color
+	str	r9, [r8]
+	strb	r6, [r2]
+	strb	r7, [r3]
+	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__hand_drawing_routines__vector_table
+@	ldr	r0, =display_hand_with_circle_lines
+@	call_register	r0
+@	call	display_hand_with_circle_lines
+	ldr	r0, =display_needs_update
+	ldr	r1, =1
+	strb	r1, [r0]
+erase_something_hand_done:
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+display_hour_hand:
+	push	r0-r10
+@	change_display_mode_to_NOT_fill_rectangles_and_circles
+	ldr	r0, =hand_width
+	ldr	r1, =hour_hand_width
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r0, =current_x_position_of_end_of_hour_hand
+	ldr	r1, =current_y_position_of_end_of_hour_hand
+	ldr	r4, =old_x_position_of_end_of_hour_hand
+	ldr	r5, =old_y_position_of_end_of_hour_hand
+	ldr	r9, =hour_hand_color
+	ldr	r9, [r9]
+	call	display_something_hand
+@	change_display_mode_to_fill_rectangles_and_circles
+	pop	r0-r10
+	return
+
+display_minute_hand:
+	push	r0-r10
+	ldr	r0, =hand_width
+	ldr	r1, =minute_hand_width
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r0, =current_x_position_of_end_of_minute_hand
+	ldr	r1, =current_y_position_of_end_of_minute_hand
+	ldr	r4, =old_x_position_of_end_of_minute_hand
+	ldr	r5, =old_y_position_of_end_of_minute_hand
+	ldr	r9, =minute_hand_color
+	ldr	r9, [r9]
+	call	display_something_hand
+	pop	r0-r10
+	return
+
+display_second_hand:
+	push	r0-r10
+	ldr	r0, =hand_width
+	ldr	r1, =second_hand_width
+	ldrb	r1, [r1]
+	strb	r1, [r0]
+	ldr	r0, =current_x_position_of_end_of_second_hand
+	ldr	r1, =current_y_position_of_end_of_second_hand
+	ldr	r4, =old_x_position_of_end_of_second_hand
+	ldr	r5, =old_y_position_of_end_of_second_hand
+	ldr	r9, =second_hand_color
+	ldr	r9, [r9]
+	call	display_something_hand
+	pop	r0-r10
+	return
+
+display_something_hand:
+	ldrb	r0, [r0]
+	ldrb	r1, [r1]
+	ldr	r2, =current_x_position_of_end_of_hand
+	ldr	r3, =current_y_position_of_end_of_hand
+	@ r0 = current x position (source)
+	@ r1 = current y position (source)
+	@ r2 = address of x position of hand to be drawn (destination)
+	@ r3 = address of y position of hand to be drawn (destination)
+	@ r4 = address of old x position (comparison)
+	@ r5 = address of old y position (comparison)
+	@ r6 = x position of hand to be drawn (destination)
+	@ r7 = y position of hand to be drawn (destination)
+	@ r8 = address of color
+	@ r9 = color
+	@ r10 = whether this is the first time drawing
+	ldr	r8, =color
+	str	r9, [r8]
+	strb	r0, [r2]
+	strb	r1, [r3]
+		strb	r0, [r4]
+		strb	r1, [r5]
+	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__hand_drawing_routines__vector_table
+@	call	display_hand_with_circle_lines
+@	strb	r0, [r4]
+@	strb	r1, [r5]
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+clock_face_mode__hand_drawing_routines__vector_table:
+	b	display_hand_with_circles
+	b	display_hand_with_circle_lines
+	b	display_hand_with_circle_lines
+	b	display_hand_with_circle_lines
+
+display_hand_with_circle_lines:
+	push	r0-r11
+	ldr	r0, =hand_width
+	ldrb	r0, [r0]
+	ldr	r1, =radius_of_circle
+	strb	r0, [r1]
+	ldr	r0, =display_center_of_hands_x
+	ldr	r1, =display_center_of_hands_y
+	mov	r0, r0, lsl #fixed_point_shift_by
+	mov	r1, r1, lsl #fixed_point_shift_by
+	ldr	r2, =current_x_position_of_end_of_hand
+	ldrb	r2, [r2]
+	ldr	r3, =current_y_position_of_end_of_hand
+	ldrb	r3, [r3]
+	mov	r2, r2, lsl #fixed_point_shift_by
+	mov	r3, r3, lsl #fixed_point_shift_by
+	ldrb	r4, =log_base_2_of_how_many_circles_to_draw_for_one_hand
+	@ r0 = x position of beginning of line segment (fixed-point)
+	@ r1 = y position of beginning of line segment (fixed-point)
+	@ r2 = x position of end of line segment (fixed-point)
+	@ r3 = y position of end of line segment (fixed-point)
+	@ r4 = log base 2 of how many circles to place along this line segment
+	sub	r5, r2, r0
+@	mov	r5, r5, lsl #fixed_point_shift_by
+	mov	r5, r5, asr r4
+	sub	r6, r3, r1
+@	mov	r6, r6, lsl #fixed_point_shift_by
+	mov	r6, r6, asr r4
+@	mov	r6, r6, asr #fixed_point_shift_by
+@	mov	r6, r6, asr #fixed_point_shift_by
+	ldr	r9, =x_position_of_center_of_circle
+	ldr	r10, =y_position_of_center_of_circle
+		add	r0, r0, #display_routine_offset_x<<fixed_point_shift_by
+		sub	r1, r1, #display_routine_offset_y<<fixed_point_shift_by
+	mov	r7, r0
+	mov	r8, r1
+	ldr	r11, =1
+	mov	r11, r11, lsl r4
+	@ r5 = delta x (fixed-point)
+	@ r6 = delta y (fixed-point)
+	@ r7 = current x (fixed-point)
+	@ r8 = current y (fixed-point)
+	@ r9 = address of center of circle in x direction
+	@ r10 = address of center of circle in y direction
+	@ r11 = how many circles remaining to place along this line segment
+	strb	r7, [r9]
+	strb	r8, [r10]
+@	call	draw_a_circle
+@	add	r7, r7, r5, asr #fixed_point_shift_by
+@	add	r8, r8, r6, asr #fixed_point_shift_by
+	mla	r7, r11, r5, r0
+	mla	r8, r11, r6, r1
+	mov	r7, r7, asr #fixed_point_shift_by
+	mov	r8, r8, asr #fixed_point_shift_by
+@	mov	r7, r7, asr r4
+@	mov	r8, r8, asr r4
+@	cmp	r7, r2
+@	cmpLO	r8, r3
+@	bHS	1b
+	dec	r11
+display_hand_with_circle_lines_next:
+	strb	r7, [r9]
+	strb	r8, [r10]
+	call	draw_a_circle
+@	add	r7, r7, r5, asr #fixed_point_shift_by
+@	add	r8, r8, r6, asr #fixed_point_shift_by
+	mla	r7, r11, r5, r0
+	mla	r8, r11, r6, r1
+	mov	r7, r7, asr #fixed_point_shift_by
+	mov	r8, r8, asr #fixed_point_shift_by
+@	mov	r7, r7, asr r4
+@	mov	r8, r8, asr r4
+		delay_imm	count=15, saveregs=yes
+@	cmp	r7, r2
+@	cmpLO	r8, r3
+@	bHS	1b
+	dec	r11
+	bHS	display_hand_with_circle_lines_next
+	pop	r0-r11
+	return
+
+display_hand_with_circles:
+	push	r0-r11
+	ldr	r0, =hand_width
+	ldrb	r0, [r0]
+	ldr	r1, =radius_of_circle
+	strb	r0, [r1]
+	ldr	r0, =display_center_of_hands_x
+	ldr	r1, =display_center_of_hands_y
+	mov	r0, r0, lsl #fixed_point_shift_by
+	mov	r1, r1, lsl #fixed_point_shift_by
+	ldr	r2, =current_x_position_of_end_of_hand
+	ldrb	r2, [r2]
+	ldr	r3, =current_y_position_of_end_of_hand
+	ldrb	r3, [r3]
+	mov	r2, r2, lsl #fixed_point_shift_by
+	mov	r3, r3, lsl #fixed_point_shift_by
+	ldrb	r4, =log_base_2_of_how_many_circles_to_draw_for_one_hand
+	@ r0 = x position of beginning of line segment (fixed-point)
+	@ r1 = y position of beginning of line segment (fixed-point)
+	@ r2 = x position of end of line segment (fixed-point)
+	@ r3 = y position of end of line segment (fixed-point)
+	@ r4 = log base 2 of how many circles to place along this line segment
+	sub	r5, r2, r0
+@	mov	r5, r5, lsl #fixed_point_shift_by
+	mov	r5, r5, asr r4
+	sub	r6, r3, r1
+@	mov	r6, r6, lsl #fixed_point_shift_by
+	mov	r6, r6, asr r4
+@	mov	r6, r6, asr #fixed_point_shift_by
+@	mov	r6, r6, asr #fixed_point_shift_by
+	ldr	r9, =x_position_of_center_of_circle
+	ldr	r10, =y_position_of_center_of_circle
+		add	r0, r0, #display_routine_offset_x<<fixed_point_shift_by
+		sub	r1, r1, #display_routine_offset_y<<fixed_point_shift_by
+	mov	r7, r0
+	mov	r8, r1
+	ldr	r11, =1
+	mov	r11, r11, lsl r4
+	@ r5 = delta x (fixed-point)
+	@ r6 = delta y (fixed-point)
+	@ r7 = current x (fixed-point)
+	@ r8 = current y (fixed-point)
+	@ r9 = address of center of circle in x direction
+	@ r10 = address of center of circle in y direction
+	@ r11 = how many circles remaining to place along this line segment
+	strb	r7, [r9]
+	strb	r8, [r10]
+@	call	draw_a_circle
+@	add	r7, r7, r5, asr #fixed_point_shift_by
+@	add	r8, r8, r6, asr #fixed_point_shift_by
+	mla	r7, r11, r5, r0
+	mla	r8, r11, r6, r1
+	mov	r7, r7, asr #fixed_point_shift_by
+	mov	r8, r8, asr #fixed_point_shift_by
+@	mov	r7, r7, asr r4
+@	mov	r8, r8, asr r4
+@	cmp	r7, r2
+@	cmpLO	r8, r3
+@	bHS	1b
+	dec	r11
+display_hand_with_circles_next:
+	strb	r7, [r9]
+	strb	r8, [r10]
+	call	draw_a_circle
+@	add	r7, r7, r5, asr #fixed_point_shift_by
+@	add	r8, r8, r6, asr #fixed_point_shift_by
+@	mla	r7, r11, r5, r0
+@	mla	r8, r11, r6, r1
+@	mov	r7, r7, asr #fixed_point_shift_by
+@	mov	r8, r8, asr #fixed_point_shift_by
+@	mov	r7, r7, asr r4
+@	mov	r8, r8, asr r4
+@		delay_imm	count=17, saveregs=yes
+@		delay_imm	count=80, saveregs=yes
+		delay_imm	count=5, saveregs=yes
+@	cmp	r7, r2
+@	cmpLO	r8, r3
+@	bHS	1b
+@	dec	r11
+@	bHS	display_hand_with_circles_next
+	pop	r0-r11
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+prepare_screen_for_drawing_on_it:
+	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__prepare_screen_for_drawing_on_it__vector_table
+	return
+
+clock_face_mode__prepare_screen_for_drawing_on_it__vector_table:
+@	b	make_display_pretty
+	b	clear_display_and_wait
+	b	clear_display_and_wait
+	b	clear_display_and_wait
+	b	show_image_of_timex_watch_face
+@	b	make_display_turquoise
+
+.pool
+
+setup_hand_colors_default:
+	push	r0-r1
+	ldr	r0, =hour_hand_color
+	ldr	r1, =default_hour_hand_color
+	str	r1, [r0]
+	ldr	r0, =minute_hand_color
+	ldr	r1, =default_minute_hand_color
+	str	r1, [r0]
+	ldr	r0, =second_hand_color
+	ldr	r1, =default_second_hand_color
+	str	r1, [r0]
+	pop	r0-r1
+	return
+
+setup_hand_colors_timex:
+	push	r0-r1
+	ldr	r1, =black
+	ldr	r0, =hour_hand_color
+	str	r1, [r0]
+	ldr	r0, =minute_hand_color
+	str	r1, [r0]
+	ldr	r1, =red
+	ldr	r0, =second_hand_color
+	str	r1, [r0]
+	pop	r0-r1
+	return
+
+setup_hand_lengths_and_widths_default:
+	push	r0-r1
+	ldr	r0, =hour_hand_length
+	ldr	r1, =default_hour_hand_length
+	strb	r1, [r0]
+	ldr	r0, =minute_hand_length
+	ldr	r1, =default_minute_hand_length
+	strb	r1, [r0]
+	ldr	r0, =second_hand_length
+	ldr	r1, =default_second_hand_length
+	strb	r1, [r0]
+	ldr	r0, =hour_hand_width
+	ldr	r1, =default_hour_hand_width
+	strb	r1, [r0]
+	ldr	r0, =minute_hand_width
+	ldr	r1, =default_minute_hand_width
+	strb	r1, [r0]
+	ldr	r0, =second_hand_width
+	ldr	r1, =default_second_hand_width
+	strb	r1, [r0]
+	pop	r0-r1
+	return
+
+setup_hand_lengths_and_widths_for_timex_watch_face:
+	push	r0-r1
+	ldr	r0, =hour_hand_length
+	ldr	r1, =timex_hour_hand_length
+	strb	r1, [r0]
+	ldr	r0, =minute_hand_length
+	ldr	r1, =timex_minute_hand_length
+	strb	r1, [r0]
+	ldr	r0, =second_hand_length
+	ldr	r1, =timex_second_hand_length
+	strb	r1, [r0]
+	ldr	r0, =hour_hand_width
+	ldr	r1, =timex_hour_hand_width
+	strb	r1, [r0]
+	ldr	r0, =minute_hand_width
+	ldr	r1, =timex_minute_hand_width
+	strb	r1, [r0]
+	ldr	r0, =second_hand_width
+	ldr	r1, =timex_second_hand_width
+	strb	r1, [r0]
+	pop	r0-r1
+	return
+
+clear_display_and_wait:
+	clear_display
+	wait_for_n_milliseconds	n=2
+	call	setup_hand_colors_default
+	call	setup_hand_lengths_and_widths_default
+@	call	draw_a_big_circle
+@	wait_for_n_milliseconds	n=7
+@	write_image_to_screen	x=0, y=0, address=test_image_32x32.oled
+@	write_image_to_screen	x=90, y=90, address=test_image_32x32.oled
+@	write_image_to_screen	x=0, y=0, address=image_2007_10_10_s45_19667_cropped_small_oled
+@	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_10_10_s45_19667_cropped_small_oled
+@	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_12_11_s50_00165_cropped_enhanced_2_small_oled
+	return
+
+show_image_of_timex_watch_face:
+@	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_10_10_s45_19667_cropped_small_oled
+	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_12_11_s50_00165_cropped_enhanced_2_small_oled
+	call	setup_hand_colors_timex
+	call	setup_hand_lengths_and_widths_for_timex_watch_face
+	return
+
+.pool
+
+make_display_turquoise:
+	push	r0-r3
+	ldr	r0, =display_first_x
+	ldr	r1, =display_last_x
+	display_set_start_column_and_end_column	start_column_register=r0, end_column_register=r1
+
+	ldr	r0, =display_first_y
+	ldr	r1, =display_last_y
+	display_set_start_row_and_end_row	start_row_register=r0, end_row_register=r1
+
+	display_write_command_immediate	0x5c	@ all further data is display ram data
+
+	ldr	r0, =turquoise
+	mov	r1, r0, lsr #9
+	ldr	r2, =display_height_in_pixels
+make_display_turquoise_row:
+	ldr	r3, =display_width_in_pixels
+make_display_turquoise_pixel:
+	display_write_data_register	r1, saveregs=yes
+	display_write_data_register	r0, saveregs=yes
+	dec	r3
+	bHS	make_display_turquoise_pixel
+	dec	r2
+	bHS	make_display_turquoise_row
+	pop	r0-r3
+	return
+
+make_display_pretty:
+	push	r0-r6
+	ldr	r0, =display_first_x
+	ldr	r1, =display_last_x
+	display_set_start_column_and_end_column	start_column_register=r0, end_column_register=r1
+
+	ldr	r0, =display_first_y
+	ldr	r1, =display_last_y
+	display_set_start_row_and_end_row	start_row_register=r0, end_row_register=r1
+
+	display_write_command_immediate	0x5c	@ all further data is display ram data
+
+	ldr	r0, =0	@ red
+	ldr	r1, =0	@ green
+	ldr	r2, =0	@ blue
+	ldr	r5, =display_height_in_pixels
+make_display_pretty_row:
+	ldr	r6, =display_width_in_pixels>>1
+make_display_pretty_pixel:
+@	add	r0, r0, #17
+	cmp	r5, #display_height_in_pixels-1
+	addHI	r0, r0, #1
+	bLS	make_display_pretty_pixel_next
+	cmp	r5, #display_height_in_pixels-2
+	addHI	r0, r0, #1
+@	add	r0, r0, #1
+@	add	r1, r1, #2
+@	add	r2, r2, #3
+	b	make_display_pretty_pixel_next
+make_display_pretty_pixel_next:
+	mov	r3, r2
+	add	r3, r3, r2, lsl #6
+	add	r3, r3, r1, lsl #12
+	mov	r4, r3, lsr #9
+	display_write_data_register	r4, saveregs=yes
+	display_write_data_register	r3, saveregs=yes
+	display_write_data_register	r4, saveregs=yes
+	display_write_data_register	r3, saveregs=yes
+	dec	r6
+	bHS	make_display_pretty_pixel
+	dec	r5
+	bHS	make_display_pretty_row
+	pop	r0-r6
+	return
+
+draw_a_big_circle:
+	@ this draws a circle through where the hour markers should be
+	change_display_mode_to_NOT_fill_rectangles_and_circles
+	ldr	r0, =hour_markers_big_radius
+	ldr	r1, =radius_of_circle
+	strb	r0, [r1]
+
+	ldr	r0, =display_center_of_hands_x
+	ldr	r1, =x_position_of_center_of_circle
+	strb	r0, [r1]
+
+	ldr	r0, =display_center_of_hands_y
+	ldr	r1, =y_position_of_center_of_circle
+	strb	r0, [r1]
+
+	ldr	r0, =white
+	ldr	r1, =color
+	str	r0, [r1]
+
+	call	draw_a_circle
+
+	change_display_mode_to_fill_rectangles_and_circles
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+show_hour_markers:
+	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__show_hour_markers__vector_table
+	return
+
+clock_face_mode__show_hour_markers__vector_table:
+	b	draw_latin_numbers_around_the_clock_face
+	b	draw_latin_numbers_around_the_clock_face
+	b	display_12_dots_around_the_clock_face
+	return
+@	return
+
+display_12_dots_around_the_clock_face:
+	push	r0-r12
+	ldr	r0, =hour_dots_little_radius_others
+	ldr	r1, =radius_of_circle
+	strb	r0, [r1]
+@	ldr	r0, =grey
+	ldr	r0, =white
+	ldr	r1, =color
+	str	r0, [r1]
+	ldr	r0, =0
+	ldr	r1, =hour_markers_big_radius
+	ldr	r2, =beginning_of_sine_lookup_table
+	ldr	r3, =beginning_of_cosine_lookup_table
+	ldr	r4, =display_center_of_hands_x
+	ldr	r5, =display_center_of_hands_y
+	ldr	r8, =x_position_of_center_of_circle
+	ldr	r9, =y_position_of_center_of_circle
+@	ldr	r10, =one_twelvth_fp
+@	ldr	r12, =1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table
+	ldr	r10, =one_twelvth_of_the_lookup_table
+	ldr	r12, =dummy_1
+@	str	r10, [r12], #4
+@	str	r10, [r12]
+1:
+	mul	r11, r0, r10
+@	mul	r11, r12, r11
+@	mov	r11, r11, lsr #(fixed_point_shift_by-1+log_base_2_of_four_fifths_of_the_size_of_the_lookup_table)
+	mov	r11, r11, lsr #fixed_point_shift_by
+	mov	r11, r11, lsl #1
+	ldrsh	r6, [r2, r11]
+	ldrsh	r7, [r3, r11]
+	mul	r6, r1, r6
+	mul	r7, r1, r7
+	mov	r6, r6, lsr #fixed_point_shift_by
+	mov	r7, r7, lsr #fixed_point_shift_by
+@	str	r0, [r12], #4
+@	str	r6, [r12], #4
+@	str	r7, [r12], #4
+	add	r6, r4, r6
+	sub	r7, r5, r7
+@	add	r7, r5, r7
+@	str	r6, [r12], #4
+@	str	r7, [r12], #4
+	strb	r6, [r8]
+	strb	r7, [r9]
+	call	draw_a_circle
+	delay_imm	1, saveregs=yes	@ only needed at 20MHz
+	inc	r0
+	cmp	r0, #12
+	bLO	1b
+	
+	ldr	r0, =hour_dots_little_radius_0369
+	ldr	r1, =radius_of_circle
+	strb	r0, [r1]
+@	ldr	r0, =grey
+	ldr	r0, =white
+	ldr	r1, =color
+	str	r0, [r1]
+	ldr	r0, =0
+	ldr	r1, =hour_markers_big_radius
+	ldr	r2, =beginning_of_sine_lookup_table
+	ldr	r3, =beginning_of_cosine_lookup_table
+	ldr	r4, =display_center_of_hands_x
+	ldr	r5, =display_center_of_hands_y
+	ldr	r8, =x_position_of_center_of_circle
+	ldr	r9, =y_position_of_center_of_circle
+@	ldr	r10, =one_twelvth_fp
+@	ldr	r12, =1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table
+	ldr	r10, =one_quarter_of_the_lookup_table
+		ldr	r12, =dummy_1
+@		str	r10, [r12], #4
+@		str	r10, [r12]
+1:
+	mul	r11, r0, r10
+@		mul	r11, r12, r11
+@		mov	r11, r11, lsr #(fixed_point_shift_by-1+log_base_2_of_four_fifths_of_the_size_of_the_lookup_table)
+	mov	r11, r11, lsr #fixed_point_shift_by
+	mov	r11, r11, lsl #1
+	ldrsh	r6, [r2, r11]
+	ldrsh	r7, [r3, r11]
+	mul	r6, r1, r6
+	mul	r7, r1, r7
+	mov	r6, r6, lsr #fixed_point_shift_by
+	mov	r7, r7, lsr #fixed_point_shift_by
+@		str	r0, [r12], #4
+@		str	r6, [r12], #4
+@		str	r7, [r12], #4
+	add	r6, r4, r6
+	sub	r7, r5, r7
+@		add	r7, r5, r7
+@		str	r6, [r12], #4
+@		str	r7, [r12], #4
+	strb	r6, [r8]
+	strb	r7, [r9]
+	call	draw_a_circle
+	delay_imm	1, saveregs=yes	@ only needed at 20MHz
+	inc	r0
+	cmp	r0, #4
+	bLO	1b
+	pop	r0-r12
+	return
+
+draw_latin_numbers_around_the_clock_face:
+@	push	r0-r12
+	ldr	r0, =font_color
+	ldr	r1, =default_font_color
+	str	r1, [r0]
+
+	ldr	r0, =0
+	ldr	r1, =hour_markers_big_radius
+	ldr	r2, =beginning_of_sine_lookup_table
+	ldr	r3, =beginning_of_cosine_lookup_table
+	ldr	r4, =display_center_of_hands_x
+	ldr	r5, =display_center_of_hands_y
+	ldr	r8, =position_of_center_of_current_character_x
+	ldr	r9, =position_of_center_of_current_character_y
+	ldr	r10, =one_twelvth_of_the_lookup_table
+	ldr	r12, =current_character
+draw_latin_numbers_around_the_clock_face_next:
+	mul	r11, r0, r10
+	mov	r11, r11, lsr #fixed_point_shift_by
+	mov	r11, r11, lsl #1
+	ldrsh	r6, [r2, r11]
+	ldrsh	r7, [r3, r11]
+	mul	r6, r1, r6
+	mul	r7, r1, r7
+	mov	r6, r6, lsr #fixed_point_shift_by
+	mov	r7, r7, lsr #fixed_point_shift_by
+	add	r6, r4, r6
+	sub	r7, r5, r7
+	strb	r6, [r8]
+	strb	r7, [r9]
+
+	push	r1-r3
+
+	ldr	r2, ='0
+	add	r1, r0, r2
+	strb	r1, [r12]
+
+	cmp	r0, #0
+	bNE	draw_latin_numbers_around_the_clock_face_not_0
+	ldr	r1, ='1
+	strb	r1, [r12]
+	ldr	r1, =character_width>>1
+	sub	r2, r6, r1
+	strb	r2, [r8]
+	call	draw_a_number
+	ldr	r1, ='2
+	strb	r1, [r12]
+	ldr	r1, =character_width+character_horizontal_spacing_between_characters
+	add	r2, r2, r1
+	strb	r2, [r8]
+
+draw_latin_numbers_around_the_clock_face_not_0:
+	cmp	r0, #10
+	bNE	draw_latin_numbers_around_the_clock_face_not_10
+	ldr	r1, ='1
+	strb	r1, [r12]
+	ldr	r1, =character_width>>1
+	sub	r2, r6, r1
+	strb	r2, [r8]
+	call	draw_a_number
+	ldr	r1, ='0
+	strb	r1, [r12]
+	ldr	r1, =character_width+character_horizontal_spacing_between_characters
+	add	r2, r2, r1
+	strb	r2, [r8]
+
+draw_latin_numbers_around_the_clock_face_not_10:
+	cmp	r0, #11
+	bNE	draw_latin_numbers_around_the_clock_face_not_11
+	ldr	r1, ='1
+	strb	r1, [r12]
+	ldr	r1, =character_width>>1
+	sub	r2, r6, r1
+	strb	r2, [r8]
+	call	draw_a_number
+	ldr	r1, ='1
+	strb	r1, [r12]
+	ldr	r1, =character_width+character_horizontal_spacing_between_characters
+	add	r2, r2, r1
+	strb	r2, [r8]
+
+draw_latin_numbers_around_the_clock_face_not_11:
+
+	call	draw_a_number
+
+	pop	r1-r3
+
+@		ldr	r0, =position_of_center_of_current_character_x
+@		ldrb	r1, [r0]
+@		ldr	r2, =character_width+character_horizontal_spacing_between_characters
+@		add	r1, r1, r2
+@		strb	r1, [r0]
+
+@	delay_imm	1, saveregs=yes	@ only needed at 20MHz
+	inc	r0
+	cmp	r0, #12
+	bLO	draw_latin_numbers_around_the_clock_face_next
+
+@	pop	r0-r12
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+draw_clock_face:
+	@ this determines the initial time and displays it on the clock:
+	call	read_rtc
+	call	copy_raw_bcd_time_to_buffered_bcd_time
+	call	copy_buffered_bcd_time_to_buffered_binary_time
+	call	determine_position_of_second_hand
+	call	determine_position_of_minute_hand
+	call	determine_position_of_hour_hand
+	call	show_hour_markers
+	call	display_hour_hand
+	call	display_minute_hand
+@	call	display_second_hand	@ don't do this here, or it might jump from 5s to 5.7s
+	return
+
+draw_clock_face_if_necessary:
+	call	read_rtc
+	call	copy_raw_bcd_time_to_buffered_bcd_time
+	call	copy_buffered_bcd_time_to_buffered_binary_time
+	call	reset_tenths_of_seconds_timer_and_value_if_necessary
+	call	calculate_tenths_of_seconds
+	call	determine_position_of_second_hand
+	call	determine_position_of_minute_hand
+	call	determine_position_of_hour_hand
+
+	ldr	r0, =display_needs_redrawing
+	ldrb	r1, [r0]
+	cmp	r1, #0
+	bEQ	draw_clock_face_next
+	call	show_hour_markers
+	call	display_hands
+	ldr	r1, =0
+	strb	r1, [r0]
+	b	draw_clock_face_done
+draw_clock_face_next:
+	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__erase_hands__vector_table
+	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__draw_hands__vector_table
+draw_clock_face_done:
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+clock_face_mode__erase_hands__vector_table:
+	b	draw_clock_face__erase_hands
+	b	draw_clock_face__erase_hands
+	b	draw_clock_face__erase_hands
+	b	draw_clock_face__erase_hands_to_white
+@	b	draw_clock_face__erase_hands__03
+
+draw_clock_face__erase_hands:
+	reset__display_needs_update
+	call	erase_hour_hand_if_necessary
+	call	erase_minute_hand_if_necessary
+	call	erase_second_hand_if_necessary
+	return
+
+draw_clock_face__erase_hands_to_white:
+	reset__display_needs_update
+	ldr	r0, =background_color
+	ldr	r0, [r0]
+	push	r0
+	ldr	r0, =white
+	ldr	r1, =background_color
+	str	r0, [r1]
+	call	erase_hour_hand_if_necessary
+	call	erase_minute_hand_if_necessary
+	call	erase_second_hand_if_necessary
+	pop	r0
+	ldr	r1, =background_color
+	str	r0, [r1]
+	return
+
+draw_clock_face__erase_hands__03:
+	reset__display_needs_update
+	call	erase_hour_hand_if_necessary
+	call	erase_minute_hand_if_necessary
+@	call	erase_second_hand_if_necessary
+	return
+	
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+clock_face_mode__draw_hands__vector_table:
+	b	draw_clock_face__draw_hands
+	b	draw_clock_face__draw_hands
+	b	draw_clock_face__draw_hands
+	b	draw_clock_face__draw_hands_black
+@	b	draw_clock_face__draw_hands__03
+
+draw_clock_face__draw_hands:
+	if_display_does_not_need_update_then_jump_to	skip_drawing
+@	turn_off_general_purpose_output	output=b, saveregs=yes
+	call	display_hands
+@	turn_on_general_purpose_output	output=b, saveregs=yes
+skip_drawing:
+	return
+
+draw_clock_face__draw_hands_black:
+	if_display_does_not_need_update_then_jump_to	skip_drawing_black
+@	turn_off_general_purpose_output	output=b, saveregs=yes
+	call	display_hands_black
+@	turn_on_general_purpose_output	output=b, saveregs=yes
+skip_drawing_black:
+	return
+
+draw_clock_face__draw_hands__03:
+	if_display_does_not_need_update_then_jump_to	skip_drawing_03
+@	turn_off_general_purpose_output	output=b, saveregs=yes
+	call	display_hands
+@	turn_on_general_purpose_output	output=b, saveregs=yes
+skip_drawing_03:
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+display_hands:
+	call	display_hour_hand
+	call	display_minute_hand
+	call	display_second_hand
+	return
+
+display_hands_black:
+	call	display_hour_hand
+	call	display_minute_hand
+	call	display_second_hand
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+set_display_brightness_based_on_ambient_light_level:
+	wait_for_adc_channel	channel=4
+	load_adc_channel	channel=4, destination_register=r0
+	ldr	r1, =raw_adc_channel_data
+	strh	r0, [r1]
+	@ take our light sensor input, which ends up being 0 to about 725
+	@ multiply it by 11
+	ldr	r1, =11
+	mul	r2, r0, r1
+	@ compare the result to 8192-1 (because 725*11=7975, but it could be larger than 725)
+	ldr	r3, =0x1fff
+	cmp	r2, r3
+	@ if it's above 8192-1, make it 8192-1
+	movHI	r2, r3
+	@ divide it by 2^8
+	mov	r2, r2, lsr #9
+	@ result is between 0 and f, so load display master current with that value
+@	push	r2
+	ldr	r0, =current_display_brightness_level
+	strb	r2, [r0]
+@	pop	r2
+@		ldr	r2, =2
+	display_set_master_current_from_register	master_current_register=r2
+	return
+
+.pool
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+draw_a_red_border_around_the_screen:
+@	push
+	draw_line_imm	display_first_x, display_last_x, display_first_y, display_first_y, 0b111111000, 0b000000000	@ first displayed row
+	delay_imm	55
+	draw_line_imm	display_first_x, display_last_x, display_last_y, display_last_y, 0b111111000, 0b000000000	@ last displayed row
+	delay_imm	55
+	draw_line_imm	display_first_x, display_first_x, display_first_y, display_last_y, 0b111111000, 0b000000000	@ first displayed column
+	delay_imm	55
+	draw_line_imm	display_last_x, display_last_x, display_first_y, display_last_y, 0b111111000, 0b000000000	@ last displayed column
+	delay_imm	55
+@	pop	r
+	return
+
+draw_a_set_of_crosshairs:
+@	push
+	draw_line_imm	display_first_x, display_last_x, display_center_y, display_center_y, 0b111111000, 0b000000000	@ center displayed row
+	delay_imm	55
+	draw_line_imm	display_center_x, display_center_x, display_first_y, display_last_y, 0b111111000, 0b000000000	@ last displayed row
+	delay_imm	55
+@	pop	r
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+

@@ -1,0 +1,570 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@ audited for saveregsness 2007-10-27
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	idle
+	ldr	r0, =PMC
+	ldr	r1, =bit00
+	str	r1, [r0, #PMC_System_Clock_Disable_Register_offset]
+	@ after this is done, the jtag debugger won't be able to talk to the uC until the reset button has been set
+.endm
+
+.macro	reset_device
+	@ perform device reset:
+	@ don't bother with saving registers
+	ldr	r0, =RSTC
+	ldr	r1, =reset_bits_for_full_reset
+	str	r1, [r0, #Reset_Controller_Control_Register_offset]
+.endm
+
+.macro	reset_if_requested
+	@ this doesn't reset the device (for sam-ba boot bugginess) - it just jumps to the reset exception vector address
+	ldr	r0, =RSTC
+	ldr	r1, =bit00
+	ldr	r2, [r0, #Reset_Controller_Status_Register_offset]
+	tst	r2, r1
+	bEQ	1f
+@	display_activate_reset
+@	delay_imm	9000
+@	display_deactivate_reset
+@	b	reset_vector
+	reset_device
+1:
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	push	registerrange
+	stmed	sp!, {\registerrange}
+.endm
+
+.macro	pop	registerrange
+	ldmed	sp!, {\registerrange}
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	store_register_in_base_plus_offset_address	register, address_base, address_offset, saveregs=no
+	.ifc	\register, r0
+		.ifc \saveregs,yes
+			push	r1
+		.endif
+		ldr	r1, =\address_base
+		str	\register, [r1, #\address_offset]
+		.ifc \saveregs,yes
+			pop	r1
+		.endif
+	.else
+		.ifc \saveregs,yes
+			push	r0
+		.endif
+		ldr	r0, =\address_base
+		str	\register, [r0, #\address_offset]
+		.ifc \saveregs,yes
+			pop	r0
+		.endif
+	.endif
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	set_bit_in_system_controller_register	bit, address_base, address_offset, saveregs=no
+	@ setup a port_a bit to be associated with parallel io instead of an integrated peripheral:
+	.ifc \saveregs,yes
+		push	r0-r1
+	.endif
+	@ this set of 3 instructions works, along with the last two before the pop:
+@	mov	r0, \bit	@ load r0 with the bit we want to use
+@	mov	r1, #bit00	@ load r1 with a 1 in the 0th bit
+@	mov	r1, r1, LSL r0	@ load r1 with r1, logically shifted left by r0 bits
+	@ this set of 2 instructions works, along with the last two before the pop:
+	mov	r0, #bit00	@ load r0 with a 1 in the 0th bit
+	mov	r1, r0, lsl \bit @ load r1 with r0 lsl'd by the number of bits we want
+	ldr	r0, =\address_base @ load r0 with the port a configuration register block base address
+	str	r1, [r0, #\address_offset]	@ load the memory address specified by [r0+an offset] with the contents of r1 (the bitmask we want)
+	.ifc \saveregs,yes
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	set_bitmask_in_system_controller_register	bitmask_register, address_base, address_offset, saveregs=no
+	@ setup a port_a bit to be associated with parallel io instead of an integrated peripheral:
+@		push	r0-r1
+@	ldr	r0, =\register	@ load r0 with the port a configuration register block base address
+@	mov	r1, \bitmask
+@	str	r1, [r0, #\register_offset]	@ load the memory address specified by [r0+an offset] with the contents of r1 (the bitmask we want)
+@	.ifc \saveregs,yes
+@		pop	r0-r1
+@	.endif
+@	.ifc \saveregs,yes
+@		push	r0
+@	.endif
+	store_register_in_base_plus_offset_address	register=\bitmask_register, address_base=\address_base, address_offset=\address_offset, saveregs=\saveregs
+@	.ifc \saveregs,yes
+@		pop	r0
+@	.endif
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	push_flags_through	register
+	@ this destroys the contents of \register and the cpsr
+	mrs	\register, cpsr
+	push	\register
+.endm
+
+.macro	pop_flags_through	register
+	@ this destroys the contents of \register and the cpsr
+	pop	\register
+	msr	cpsr_cxsf, \register
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	dec	register, saveregs=no
+	@ this alters the contents of \register (and the cpsr if saveregs=no)
+	@ saveregs=yes saves the flags here - in that case, the zero flag won't correspond to decrementing to zero
+	@ would be easier to just use sub instead of subS and save/restoring the flags...
+	.ifc \saveregs,yes
+		.ifc	\register, r0
+			push	r1
+			push_flags_through	r1
+		.else
+			push	r0
+			push_flags_through	r0
+		.endif
+	.endif
+	subS	\register, \register, #1
+	.ifc \saveregs,yes
+		.ifc	\register, r0
+			pop_flags_through	r1
+			pop	r1
+		.else
+			pop_flags_through	r0
+			pop	r0
+		.endif
+	.endif
+.endm
+
+.macro	inc	register, saveregs=no
+	@ this alters the contents of \register (and the cpsr if saveregs=no)
+	@ saveregs=yes saves the flags here - in that case, the zero flag won't correspond to decrementing to zero
+	@ would be easier to just use sub instead of subS and save/restoring the flags...
+	.ifc \saveregs,yes
+		.ifc	\register, r0
+			push	r1
+			push_flags_through	r1
+		.else
+			push	r0
+			push_flags_through	r0
+		.endif
+	.endif
+	addS	\register, \register, #1
+	.ifc \saveregs,yes
+		.ifc	\register, r0
+			pop_flags_through	r1
+			pop	r1
+		.else
+			pop_flags_through	r0
+			pop	r0
+		.endif
+	.endif
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	delay_asm	count, saveregs=no
+	@ the c function doesn't save registers, so this may cause bugs
+	.ifc \saveregs,yes
+		push	lr
+		push	r0
+	.endif
+	ldr	r0, =\count
+	call	delay__c
+	.ifc \saveregs,yes
+		pop	r0
+		pop	lr
+	.endif
+.endm
+
+.macro	delay_ms_imm	number_of_milliseconds, saveregs=no
+	@ 0 => 2^32
+	.ifc \saveregs,yes
+		push	r0-r1
+		push_flags_through	r0
+	.endif
+	ldr	r1, =\number_of_milliseconds
+5:
+	delay_imm	4608	@ works for 18.432MHz crystal with no prescaling
+	dec	r1
+	bNE	5b
+	.ifc \saveregs,yes
+		pop_flags_through	r0
+		pop	r0-r1
+	.endif
+.endm
+
+.macro	delay_imm	count, saveregs=no
+	@ saveregs=yes should save the flags here and r0
+	.ifc \saveregs,yes
+		push	r0
+		push_flags_through	r0
+	.endif
+	ldr	r0, =\count
+0:
+	dec	r0
+	bNE	0b
+	.ifc \saveregs,yes
+		pop_flags_through	r0
+		pop	r0
+	.endif
+.endm
+
+.macro	delay_reg	register, saveregs=no
+	@ saveregs=yes saves the flags here, as well as \register
+	.ifc \saveregs,yes
+		.ifc	\register, r0
+			push	r1
+			push_flags_through	r1
+		.else
+			push	r0
+			push_flags_through	r0
+		.endif
+	.endif
+0:
+	dec	\register
+	bHS	0b
+	.ifc \saveregs,yes
+		.ifc	\register, r0
+			pop_flags_through	r1
+			pop	r1
+		.else
+			pop_flags_through	r0
+			pop	r0
+		.endif
+	.endif
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	call_register	register
+	push	lr
+	mov	lr, pc
+	mov	pc, \register
+@	blx	\register
+	pop	lr
+.endm
+
+.macro	call	address
+	push	lr
+	bl	\address
+	pop	lr
+.endm
+
+.macro	vectored_call	min, variable, max, vector_table
+	@ variable must be only a byte
+	push	r0-r2
+	ldr	r0, =\vector_table
+@	ldr	r1, =\vector_table_end
+@	sub	r2, r1, r0
+	ldr	r1, =\variable
+	ldrb	r1, [r1]
+		push	r0-r12
+	keep_it_between_unsigned	min=\min, it=r1, max=\max
+		pop	r0-r12
+	ldr	r2, =4
+	mla	r0, r2, r1, r0
+		ldr	r1, =dummy_4+4
+		str	r0, [r1]
+	call_register	r0
+	pop	r0-r2
+.endm
+
+.macro	return
+	mov	pc, lr
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	neg	destination_register, source_register
+@untested!
+	rsb	\destination_register, \source_register, #0
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	debug	register
+	push	r0-r3
+	mov	r0, \register
+	ldr	r1, =debug_stack_pointer
+	ldr	r2, [r1]
+	ldr	r3, =end_of_debug_stack
+	cmp	r2, r3
+	bHS	1f
+	str	r0, [r2], #4
+	str	r2, [r1]
+1:
+	pop	r0-r3
+.endm
+
+.macro	debug_if_changed	register
+	push	r0-r3
+	mov	r0, \register
+	ldr	r1, =debug_stack_pointer
+	ldr	r2, [r1]
+	ldr	r3, =end_of_debug_stack
+	cmp	r2, r3
+	bHS	1f
+	ldr	r3, [r2, #-4]
+	cmp	r0, r3
+	strNE	r0, [r2], #4
+	strNE	r2, [r1]
+1:
+	pop	r0-r3
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	old_keep_it_between_unsigned	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become min
+	@ if it's lower than min when this macro starts, it'll become max
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	bHS	2f
+	@ too_low
+	ldr	\it, =\max
+2:
+	@ not_too_low
+	cmp	\it, #\max
+	bLS	4f
+	@ too_high
+	ldr	\it, =\min
+4:
+	@ not_too_high
+.endm
+
+.macro	old_keep_it_between_unsigned_ping_pong	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become max
+	@ if it's lower than min when this macro starts, it'll become min
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	bHS	1f
+	@ too_low
+	ldr	\it, =\min
+1:
+	@ not_too_low
+	cmp	\it, #\max
+	bLS 3f
+	@ too_high
+	ldr	\it, =\max
+	@ not_too_high
+3:
+.endm
+
+.macro	old_keep_it_between_signed	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become min
+	@ if it's lower than min when this macro starts, it'll become max
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	bGE	2f
+	@ too_low
+	ldr	\it, =\max
+2:
+	@ not_too_low
+	cmp	\it, #\max
+	bLE	4f
+	@ too_high
+	ldr	\it, =\min
+4:
+	@ not_too_high
+.endm
+
+.macro	old_keep_it_between_signed_ping_pong	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become max
+	@ if it's lower than min when this macro starts, it'll become min
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	bGE	1f
+	@ too_low
+	ldr	\it, =\min
+1:
+	@ not_too_low
+	cmp	\it, #\max
+	bLE 3f
+	@ too_high
+	ldr	\it, =\max
+	@ not_too_high
+3:
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	keep_it_between_unsigned	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become min
+	@ if it's lower than min when this macro starts, it'll become max
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	ldrLO	\it, =\max
+	cmp	\it, #\max
+	ldrHI	\it, =\min
+	@ not_too_high
+.endm
+
+.macro	keep_it_between_unsigned_ping_pong	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become max
+	@ if it's lower than min when this macro starts, it'll become min
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	ldrLO	\it, =\min
+	cmp	\it, #\max
+	ldrHI	\it, =\max
+.endm
+
+.macro	keep_it_between_signed	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become min
+	@ if it's lower than min when this macro starts, it'll become max
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	ldrLT	\it, =\max
+	cmp	\it, #\max
+	ldrGT	\it, =\min
+.endm
+
+.macro	keep_it_between_signed_ping_pong	min, it, max
+	@ this modifies "it" even if saveregs=yes
+	@ this keeps the statement min <= it <= max true
+	@ if it's higher than max when this macro starts, it'll become max
+	@ if it's lower than min when this macro starts, it'll become min
+	@ if min is greater than max, it will be set to ???
+	cmp	\it, #\min
+	ldrLT	\it, =\min
+	cmp	\it, #\max
+	ldrGT	\it, =\max
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	wait_for_n_milliseconds	n, saveregs=no
+	.ifc	\saveregs,yes
+		push	r0-r3
+	.endif
+	@ this will count up to 3.640 seconds (16 bit counter where 18 counts = 1ms)
+	@ the above statement is no longer correct
+	ldr	r0, =TC0
+	ldr	r1, =bit00
+	ldr	r2, =0
+	add	r2, r2, r1, lsl #1	@ disable this clock
+	str	r2, [r0, #TC_Channel_Control_Register_offset]	@ stop the counter
+	ldr	r2, =0
+	add	r2, r2, r1, lsl #0	@ enable this clock
+	add	r2, r2, r1, lsl #2	@ trigger this clock to reset and start counting
+	ldr	r1, =number_of_TC0_clock_periods_in_one_millisecond
+	ldr	r1, [r1]
+	ldr	r3, =\n
+	mul	r3, r1, r3
+	ldr	r1, [r0, #TC_Counter_Value_Register_offset]
+	str	r2, [r0, #TC_Channel_Control_Register_offset]	@ start the counter
+@	ldr	r2, =18
+@	mul	r2, r2, r3
+	cmp	r1, #0
+	bEQ	2f
+@ before_waiting_for_n_milliseconds:
+1:
+	ldr	r1, [r0, #TC_Counter_Value_Register_offset]
+	cmp	r1, #0
+	bNE	1b
+@ waiting_for_n_milliseconds:
+2:
+	ldr	r1, [r0, #TC_Counter_Value_Register_offset]
+	@ wait until the counter hits n*number_of_TC0_clock_periods_in_one_millisecond
+	cmp	r1, r3
+	bLO	2b
+	.ifc	\saveregs,yes
+		pop	r0-r3
+	.endif
+.endm
+
+.macro	reset_TC1	saveregs=no
+	.ifc	\saveregs,yes
+		push	r0-r2
+	.endif
+	ldr	r0, =TC1
+	ldr	r1, =bit00
+	ldr	r2, =0
+	add	r2, r2, r1, lsl #1	@ disable this clock
+	str	r2, [r0, #TC_Channel_Control_Register_offset]	@ stop the counter
+	ldr	r2, [r0, #TC_Counter_Value_Register_offset]
+	cmp	r2, #0
+	ldr	r2, =0
+	add	r2, r2, r1, lsl #0	@ enable this clock
+	add	r2, r2, r1, lsl #2	@ trigger this clock to reset and start counting
+	str	r2, [r0, #TC_Channel_Control_Register_offset]	@ start the counter
+	bEQ	reset_TC1_done
+reset_TC1_waiting:
+	ldr	r1, [r0, #TC_Counter_Value_Register_offset]
+	cmp	r2, r1
+	bLS	reset_TC1_waiting
+reset_TC1_done:
+	.ifc	\saveregs,yes
+		pop	r0-r2
+	.endif
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+@.macro	rgb_24	r, g, b
+@.endm
+
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	toggle_general_purpose_output	output
+	push	r0-r1
+	ldr	r0, =general_purpose_output_toggle_status
+	ldrb	r1, [r0]
+	inc	r1
+	strb	r1, [r0]
+	tst	r1, #bit00
+	bEQ	7f
+	turn_on_general_purpose_output	output=\output, saveregs=yes
+	b	9f
+7:
+	turn_off_general_purpose_output	output=\output, saveregs=yes
+9:
+	pop	r0-r1
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+

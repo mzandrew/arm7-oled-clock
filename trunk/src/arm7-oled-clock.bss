@@ -1,0 +1,208 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+.align	4
+.bss @ zero-initialized ram variables (doesn't get stored in flash; has to be initialized)
+
+.global beginning_of_cosine_lookup_table
+.global beginning_of_sine_lookup_table
+.global end_of_cosine_lookup_table
+.global end_of_sine_lookup_table
+.global	one_over_n_fp_lookup_table
+.global	size_of_entire_lookup_table_in_words
+.global two_pi_fp
+
+.global	bcd_time_of_day
+.global	clock_bcd_hours
+.global	clock_bcd_minutes
+.global get_clock_block
+.global bcd_time_of_day
+.global time_of_day
+
+.global dummy_1
+.global dummy_2
+.global dummy_3
+.global dummy_4
+
+.global master_clock_frequency
+.global main_clock_frequency
+.global pll_clock_frequency
+.global timer_frequency
+.global	number_of_TC0_clock_periods_in_one_millisecond
+.global	number_of_TC1_clock_periods_in_one_tenth_of_a_second
+
+.global rotary_encoder_previous_position
+.global rotary_encoder_current_position
+.global rotary_encoder_value
+.global	rotary_encoder_signed_delta_unstable
+.global	rotary_encoder_signed_delta_stable
+.global rotary_encoder_signed_delta_stable_previous_increase_or_decrease
+.global clock_tenths_of_seconds
+
+.global	clock_raw_bcd_hours_and_am_pm
+.global	clock_bcd_hours
+
+.align	4
+main_clock_frequency: .word 0
+pll_clock_frequency:	.word 0
+master_clock_frequency: .word 0
+timer_frequency: .word 0
+number_of_timer_clock_ticks_in_one_millisecond: .word 0
+number_of_TC0_clock_periods_in_one_millisecond:	.word 0
+number_of_TC1_clock_periods_in_one_tenth_of_a_second: .word 0
+
+.align	4
+get_clock_block:
+dummy_read:	.byte	0
+clock_raw_bcd_seconds:	.byte	0
+clock_raw_bcd_seconds_offset = clock_raw_bcd_seconds - get_clock_block
+clock_raw_bcd_minutes:	.byte	0
+clock_raw_bcd_hours_and_am_pm:	.byte	0
+clock_raw_bcd_day_of_week:	.byte	0
+clock_raw_bcd_day_of_month:	.byte	0
+clock_raw_bcd_month:	.byte	0
+clock_raw_bcd_year:	.byte	0
+
+.align	4
+bcd_time_of_day:	@ this is what's currently displayed on the clock face (to compare against the current time above
+@ to see if the display needs to be updated)
+clock_bcd_seconds:	.byte	0
+clock_bcd_minutes:	.byte	0
+clock_bcd_hours:	.byte	0
+clock_bcd_day_of_week:	.byte	0
+clock_bcd_day_of_month:	.byte	0
+clock_bcd_month_of_year:	.byte	0
+clock_bcd_year:	.byte	0
+clock_bcd_am_pm:	.byte	0
+
+.align	4
+time_of_day:	@ this is what's currently displayed on the clock face (to compare against the current time above
+@ to see if the display needs to be updated)
+clock_seconds:	.byte	0
+clock_minutes:	.byte	0
+clock_hours:	.byte	0
+clock_day_of_week:	.byte	0
+clock_day_of_month:	.byte	0
+clock_month_of_year:	.byte	0
+clock_year:	.byte	0
+clock_am_pm:	.byte	0
+
+clock_tenths_of_seconds:	.byte 0
+
+seconds_have_changed:	.byte 0
+
+.align	4
+font_color:	.word 0
+current_character:	.byte 0
+position_of_center_of_current_character_x:	.byte 0
+position_of_center_of_current_character_y:	.byte 0
+
+.align	4
+position_of_beginning_of_line_x:	.byte 0
+position_of_beginning_of_line_y:	.byte 0
+position_of_end_of_line_x:	.byte 0
+position_of_end_of_line_y:	.byte 0
+
+.align	4
+lookup_table:	.space	2*size_of_entire_lookup_table_in_words
+.align	4
+just_after_end_of_lookup_table:
+
+ratio_fp:	.word 0
+color:	.word	0
+
+clock_variable:	.word 0
+
+@ bytes:
+
+x_position_of_center_of_circle:	.byte 0
+y_position_of_center_of_circle:	.byte 0
+radius_of_circle:	.byte 0
+
+hand_length:	.byte 0
+hand_width:	.byte 0
+
+first_time:	.byte 0
+display_needs_update:	.byte 0
+
+general_purpose_output_toggle_status:	.byte 0
+
+.global clock_face_mode
+clock_face_mode:	.byte 0
+
+.align 2
+.global	raw_adc_channel_data
+raw_adc_channel_data:	.hword	0
+
+.global	current_display_brightness_level
+current_display_brightness_level:	.byte 0
+previous_display_brightness_level:	.byte 0
+
+display_needs_redrawing:	.byte 0
+
+rotary_encoder_mode:	.byte 0
+
+rotary_encoder_previous_position:	.byte 0
+rotary_encoder_current_position:	.byte 0
+
+rotary_encoder_value:	.byte 0
+rotary_encoder_signed_delta_unstable:	.byte 0
+rotary_encoder_signed_delta_stable:	.byte 0
+rotary_encoder_signed_delta_stable_previous_increase_or_decrease: .byte 0
+
+current_x_position_of_end_of_hand: .byte 0
+current_y_position_of_end_of_hand: .byte 0
+
+old_x_position_of_end_of_hour_hand:	.byte 0
+old_y_position_of_end_of_hour_hand:	.byte 0
+current_x_position_of_end_of_hour_hand: .byte 0
+current_y_position_of_end_of_hour_hand: .byte 0
+
+old_x_position_of_end_of_minute_hand:	.byte 0
+old_y_position_of_end_of_minute_hand:	.byte 0
+current_x_position_of_end_of_minute_hand: .byte 0
+current_y_position_of_end_of_minute_hand: .byte 0
+
+.global old_x_position_of_end_of_second_hand
+.global old_y_position_of_end_of_second_hand
+old_x_position_of_end_of_second_hand:	.byte 0
+old_y_position_of_end_of_second_hand:	.byte 0
+.global current_x_position_of_end_of_second_hand
+.global current_y_position_of_end_of_second_hand
+current_x_position_of_end_of_second_hand: .byte 0
+current_y_position_of_end_of_second_hand: .byte 0
+
+.align	4
+.global exception_link_register
+.global exception_type
+exception_link_register:	.word 0
+exception_type:	.word 0
+exception_temporary_1:	.word 0
+exception_temporary_2:	.word 0
+
+.align	4
+debug_stack_pointer:	.word 0
+beginning_of_debug_stack:	.space 128*4
+end_of_debug_stack:
+
+.align	4
+dummy_1:	.word	0
+dummy_2:	.word	0
+dummy_3:	.word	0
+dummy_4:	.word	0
+

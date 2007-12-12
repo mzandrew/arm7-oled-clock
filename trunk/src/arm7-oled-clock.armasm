@@ -1,0 +1,227 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+@ assembler directives
+
+.arm	@ use arm mode, not thumb mode
+.align	@ align to 32 bits
+.list	@ generate a listing
+.psize 0, 120	@ set it to not generate page feeds (break after 0 lines) and lines that are 120 columns wide
+@.cpu arm7tdmi	@ this option seems not to work
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.include "generic.equates"
+.include "at91sam7s.equates"
+.include "oled-display.equates"
+.include "arm7-oled-clock.equates"
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.include "generic.macros"
+.include "oled-display.macros"
+.include "io-pin.macros"
+.include "arm7-oled-clock.macros"
+.include "math.macros"
+.include "initialization.macros"
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.include "arm7-oled-clock.data"
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.include "arm7-oled-clock.bss"
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.align	4
+.text
+
+.include "arm7-oled-clock.functions"
+.pool
+.include "spi-rtc.functions"
+.pool
+.include "math.functions"
+.pool
+.include "oled-display.functions"
+.pool
+.include "io-pin.functions"
+.pool
+.include "font.functions"
+.pool
+.include "font.lookup-table"
+.pool
+
+@.include "work/test-image-32x32.armasm"
+@.include "work/image.2007-10-10.s45-19667-cropped-small.armasm"
+.include "work/image.2007-12-11.s50-00165-cropped-enhanced-2-small.armasm"
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.global reset_vector
+reset_vector:
+	msr	cpsr, #0b0010000	@ switch to user mode with irq and fiq disabled
+	ldr	sp, =top_of_stack
+
+	initialize_arm7_oled_clock
+@	call	show_lookup_table
+
+@	call	draw_a_red_border_around_the_screen
+@	call	draw_a_set_of_crosshairs
+
+@	call	write_rtc
+@	delay_imm	500000
+
+		ldr	r0, =exception_link_register
+		ldr	r1, =0x77777777
+		str	r1, [r0]
+
+b	main_loop
+
+.pool
+
+test_line_drawing_routines:
+	ldr	r0, =position_of_beginning_of_line_x
+	ldr	r1, =position_of_beginning_of_line_y
+	ldr	r2, =position_of_end_of_line_x
+	ldr	r3, =position_of_end_of_line_y
+	ldr	r5, =line_color
+	ldr	r6, =blue
+	str	r6, [r5]
+
+	ldr	r4, =80
+	strb	r4, [r0]
+	strb	r4, [r1]
+	ldr	r4, =64
+	strb	r4, [r2]
+	strb	r4, [r3]
+	call	draw_a_line_with_slope_magnitude_equal_to_one
+
+	ldr	r4, =80
+	strb	r4, [r0]
+	ldr	r4, =48
+	strb	r4, [r1]
+	ldr	r6, =red
+	str	r6, [r5]
+	call	draw_a_line_with_slope_magnitude_equal_to_one
+
+	ldr	r4, =48
+	strb	r4, [r0]
+	strb	r4, [r1]
+	ldr	r6, =yellow
+	str	r6, [r5]
+	call	draw_a_line_with_slope_magnitude_equal_to_one
+
+	ldr	r4, =48
+	strb	r4, [r0]
+	ldr	r4, =80
+	strb	r4, [r1]
+	ldr	r6, =green
+	str	r6, [r5]
+	call	draw_a_line_with_slope_magnitude_equal_to_one
+
+	return
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.global main_loop
+main_loop:
+	call	toggle_general_purpose_output_a
+@	pulse_general_purpose_output	output=a
+@		debug_if_changed	r15
+	call service_rotary_encoder
+	ldr	r0, =PIT
+	ldr	r1, =bit00
+	ldr	r2, [r0, #Periodic_Interval_Timer_Status_Register_offset]
+	ldr	r3, =PIOA
+	mov	r4, r1, lsl #general_purpose_output_a
+	mov	r5, r1, lsl #general_purpose_output_b
+@	str	r5, [r3, #Clear_Output_Data_Register_offset]
+@	str	r5, [r3, #Set_Output_Data_Register_offset]
+	tst	r2, r1
+	bEQ	main_loop	@ has it been at least a millisecond yet?
+	adc_start_conversion	channel=4
+	@ read how many millisecond periods we missed while updating the display and output a pulse for each one
+	ldr	r0, =PIT
+	ldr	r2, [r0, #Periodic_Interval_Timer_Value_Register_offset]
+	mov	r6, r2, lsr #20
+	ldr	r3, =PIOA
+	ldr	r1, =bit00
+	mov	r4, r1, lsl #general_purpose_output_a
+m1:
+@	str	r4, [r3, #Clear_Output_Data_Register_offset]
+@	str	r4, [r3, #Set_Output_Data_Register_offset]
+	dec	r6
+	bHI	m1
+
+@		debug_if_changed	r15
+	call	draw_clock_face_if_necessary
+	call	set_display_brightness_based_on_ambient_light_level
+@	call	draw_a_big_circle
+@	wait_for_n_milliseconds n=7
+	b	main_loop
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.global ignore_exception
+ignore_exception:
+@	mov	r13_abt, r13_usr
+@	mrs	r13, cpsr
+@	eor	r13, r13, #0b1111 @ overwrite the fake exception mode stack pointer and switch back to user mode to get access to the regular stack like god intended
+.ifc	asdf,rtyuy
+@	msr	cpsr, #0b0010000	@ switch to user mode with irq and fiq disabled
+	push	r0-r1
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	mov	r1, r1, lsl #general_purpose_output_c
+	str	r1, [r0, #Clear_Output_Data_Register_offset]
+	str	r1, [r0, #Set_Output_Data_Register_offset]
+	pop	r0-r1
+.endif
+	ldr	r13, =exception_temporary_1
+	str	r0, [r13], #4
+	str	r1, [r13]
+	@ don't just use pulse_general_purpose_output_c here unless you check that that uses r0 and r1 only and never use saveregs=yes in an exception handler
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	mov	r1, r1, lsl #general_purpose_output_c
+	str	r1, [r0, #Clear_Output_Data_Register_offset]
+	str	r1, [r0, #Set_Output_Data_Register_offset]
+	ldr	r0, =exception_link_register
+	str	lr, [r0]
+@		ldr	r1, =0x66666666
+@		str	r1, [r0]
+	mrs	r1, cpsr
+	ldr	r0, =0b11111
+	and	r1, r0, r1
+	ldr	r0, =exception_type
+	str	r1, [r0]
+@		idle
+@		bkpt
+	ldr	r1, [r13], #-4
+	ldr	r0, [r13]
+	@if this isn't in an exception mode when the next instruction is executed, the result is unpredictable:
+	subs	pc, lr, #4
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.end
+

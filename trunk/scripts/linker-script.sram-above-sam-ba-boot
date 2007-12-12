@@ -1,0 +1,39 @@
+# copyright 2007 mza (Matthew Andrew)
+# started 2007-09-19 (talk like a pirate day)
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+# or visit http://www.fsf.org/
+
+ENTRY(reset_vector)
+
+MEMORY {
+/*	flash (rx) : ORIGIN = 0x100000, LENGTH = 0x10000 */
+/*	flash (rx) : ORIGIN = 0x102000, LENGTH = 0xe000 */
+/*	sram (w) : ORIGIN = 0x202000, LENGTH = 0x2000 */
+	sram (wx) : ORIGIN = 0x202000, LENGTH = 0x2000
+/*	sram (wx) : ORIGIN = 0x200000, LENGTH = 0x4000 */
+}
+
+SECTIONS {
+	.text : { *(.glue_7) *(.glue_7t) _etext = .; } >sram
+	.text : { _etext = .; } >sram
+	.data : { _data = .; _edata = .; } >sram
+	.bss : { _bss_start = .; } >sram
+/*	.text : { _etext = .; } >flash */
+/*	.data : { _data = .; _edata = .; } >flash */
+/*	.bss : { _bss_start = .; } >sram */
+	_bss_end = .;
+}
+

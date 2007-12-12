@@ -1,0 +1,115 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@ these are for the at91sam7s64:
+
+@ my definition of "top" is the highest address; atmel's and arm's might be different
+.set	top_of_sram, 0x00300000-1
+.set	top_of_stack, top_of_sram-3	@ the 3 is to align it to a 4 byte boundary
+
+@ these are for the at91sam7s:
+
+.set	ADC, 0xFFFD8000
+.set	ADC_Control_Register_offset, 0x0
+.set	ADC_Mode_Register_offset, 0x4
+.set	ADC_Channel_Enable_offset, 0x10
+.set	ADC_Status_Register_offset, 0x1c
+.set	ADC_Channel_Data_Register_0_offset,	0x30
+.set	ADC_Channel_Data_Register_1_offset,	0x34
+.set	ADC_Channel_Data_Register_2_offset,	0x38
+.set	ADC_Channel_Data_Register_3_offset,	0x3c
+.set	ADC_Channel_Data_Register_4_offset,	0x40
+.set	ADC_Channel_Data_Register_5_offset,	0x44
+.set	ADC_Channel_Data_Register_6_offset,	0x48
+.set	ADC_Channel_Data_Register_7_offset,	0x4c
+
+.set	PIOA, 0xfffff400
+.set	parallel_io_port_a, PIOA
+@ these are from Atmel's at91sam7s techincal reference manual (pdf, page 88):
+.set	PIO_Enable_Register_offset, 0x0
+.set	PIO_Disable_Register_offset, 0x4
+.set	PIO_Status_Register_offset, 0x8
+.set	Output_Enable_Register_offset, 0x10
+.set	Output_Disable_Register_offset, 0x14
+.set	Set_Output_Data_Register_offset, 0x30
+.set	Clear_Output_Data_Register_offset, 0x34
+.set	Output_Data_Status_Register_offset, 0x38
+.set	PIO_Controller_Pin_Data_Status_Register_offset, 0x3c
+.set	Pull_Up_Disable_Register_offset, 0x60
+.set	Pull_Up_Enable_Register_offset, 0x64
+.set	PIO_Peripheral_A_Select_Register_offset, 0x70
+.set	Output_Write_Enable_Register_offset, 0xa0
+.set	Output_Write_Disable_Register_offset, 0xa4
+
+.set	PMC, 0xFFFFFC00
+.set	PMC_System_Clock_Disable_Register_offset, 0x4
+.set	PMC_Peripheral_Clock_Enable_Register_offset, 0x10
+.set	PMC_Clock_Generator_Main_Oscillator_Register_offset, 0x20
+.set	PMC_Clock_Generator_Main_Clock_Frequency_Register_offset, 0x24
+.set	PMC_Master_Clock_Register_offset, 0x30
+.set	PMC_Status_Register_offset, 0x68
+.set	PMC_Clock_Generator_PLL_Register_offset, 0x2c
+
+.set	RSTC, 0xFFFFFD00
+.set	Reset_Controller_Control_Register_offset, 0x0
+.set	Reset_Controller_Status_Register_offset, 0x4
+.set	Reset_Controller_Mode_Register_offset, 0x8
+
+.set	reset_bits_for_full_reset, 0xa500000d @ this is the key a5 in the high byte and the 3 bits in the low byte that correspond to resetting everything
+
+.set	WDT, 0xFFFFFD40
+.set	Watchdog_Timer_Mode_Register_offset, 0x04
+
+.set	PIT, 0xFFFFFD30
+.set	Periodic_Interval_Timer_Mode_Register_offset, 0x0
+.set	Periodic_Interval_Timer_Status_Register_offset, 0x4
+.set	Periodic_Interval_Timer_Value_Register_offset, 0x8
+.set	Periodic_Interval_Timer_Image_Register_offset, 0xc
+
+.set	SPI, 0xFFFE0000
+.set	SPI_Control_Register_offset, 0x0
+.set	SPI_Mode_Register_offset, 0x4
+.set	SPI_Receive_Data_Register_offset, 0x8
+.set	SPI_Transmit_Data_Register_offset, 0xc
+.set	SPI_Status_Register_offset, 0x10
+.set	SPI_Chip_Select_Register_0_offset, 0x30
+
+@ these is for the peripheral DMA controller
+# they are relative to the peripheral in question
+.set	Receive_Pointer_Register_offset, 0x100
+.set	Receive_Counter_Register_offset, 0x104
+.set	Transmit_Pointer_Register_offset, 0x108
+.set	Transmit_Counter_Register_offset, 0x10c
+.set	Receive_Next_Pointer_Register_offset, 0x110
+.set	Receive_Next_Counter_Register_offset, 0x114
+.set	Transmit_Next_Pointer_Register_offset, 0x118
+.set	Transmit_Next_Counter_Register_offset, 0x11c
+.set	PDC_Transfer_Control_Register_offset, 0x120
+.set	PDC_Transfer_Status_Register_offset, 0x124
+
+.set	MC, 0xffffff00
+.set	MC_Flash_Mode_Register_offset, 0x60
+
+.set	TC, 0xFFFA0000
+.set	TC0, TC+0x00
+.set	TC1, TC+0x40
+.set	TC2, TC+0x80
+.set	TC_Channel_Control_Register_offset, 0x0
+.set	TC_Channel_Mode_Register_offset, 0x4
+.set	TC_Counter_Value_Register_offset, 0x10
+

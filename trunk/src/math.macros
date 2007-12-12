@@ -1,0 +1,59 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@	exponent	destination_register=r0, source_register=r1, power_register=r2, divide_by_register=r3
+.macro	exponent	destination_register, source_register, power_register, shift_by_register
+	@ this is for fixed point numbers, encoded as divide-by-\shift_by_register (so if \shift_by_register=12, then the value 0x4000 = 4.0000 because 0x4000 divided by 2^12 is 4)
+	@ power must be positive (0 <= power)
+0:	ldr	\destination_register, =1
+	movS	\power_register, \power_register
+	movEQ	\destination_register, \destination_register, lsl \shift_by_register
+	bEQ	9f
+1:	cmp	\power_register, \destination_register
+	mov	\destination_register, \source_register
+	bEQ	9f
+@2:	mul	\destination_register, \source_register, \source_register
+@	mov	\destination_register, \destination_register, lsr \shift_by_register
+2:	dec	\power_register
+	mulHI	\destination_register, \source_register, \destination_register
+	movHI	\destination_register, \destination_register, lsr \shift_by_register
+	bHI	2b
+9:
+.endm
+
+@	sin	result_register, angle_register, temporary_register_1, temporary_register_2
+.macro	sin	result_register, angle_register, temporary_register_1, temporary_register_2
+@	ldr	\temporary_register_1, =2
+	push	\temporary_register_1
+	exponent	destination_register=\result_register, source_register=\angle_register, power_register=\temporary_register_1 shift_by_register=\temporary_register_2
+.ifc	asdf,asdfr
+	mov	r0, r0, lsr \temporary_register_2
+	ldr	r3, =3
+	add	r0, r0, r3
+	ldr	r3, =127
+	cmp	r0, r3
+	movHI	r0, r3
+	ldr	r2, =0b111111111111000000
+	pop	r1
+	display_set_color_of_single_pixel	x_coordinate_register=r1, y_coordinate_register=r0, color_register=r2
+.endif
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+

@@ -1,0 +1,741 @@
+@ copyright 2007 mza (Matthew Andrew)
+@ started 2007-09-19 (talk like a pirate day)
+
+@ This program is free software; you can redistribute it and/or modify
+@ it under the terms of the GNU General Public License as published by
+@ the Free Software Foundation; either version 3 of the License, or
+@ (at your option) any later version.
+
+@ This program is distributed in the hope that it will be useful,
+@ but WITHOUT ANY WARRANTY; without even the implied warranty of
+@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+@ GNU General Public License for more details.
+
+@ You should have received a copy of the GNU General Public License
+@ along with this program; if not, write to the Free Software
+@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+@ or visit http://www.fsf.org/
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	setup_embedded_flash_controller
+	ldr	r0, =MC
+	ldr	r1, =0
+	mov	r2, r1, lsl #8
+	@ set flash microsecond cycle number > 0 here if you want to write to the flash (see page 139 of atmel's pdf)
+	str	r2, [r0, #MC_Flash_Mode_Register_offset]
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	setup_watchdog_timer
+	@ setup watchdog timer
+@	set_bit_in_system_controller_register	bit=#15, register=WDT, register_offset=Watchdog_Timer_Mode_Register_offset
+	@ldr	r0, =32
+	ldr	r0, =1024
+	mov	r1, r0	@ load wdv with counter value
+	add	r1, r1, r0, lsl #16	@ load wdd with counter value
+	ldr	r0, =bit00
+	add	r1, r1, r0, lsl #28 @ halt wdt in debug mode
+	add	r1, r1, r0, lsl #29	@ halt wdt in idle mode
+	add	r1, r1, r0, lsl #15	@ disable wdt
+	@add	r1, r1, r0, lsl #13	@ enable wdt reset
+	@add	r1, r1, r0, lsl #12	@ enable wdt fault or underflow interrupt
+	@add	r1, r1, r0, lsl #14	@ wdt reset resets just the processor (as opposed to the everything reset)
+	ldr	r0, =WDT
+	str	r1, [r0, #Watchdog_Timer_Mode_Register_offset]
+	@ the wdt mode register can only be written once and the sam-ba program does that, so this will have to be tested when we go to flash
+.endm
+
+.macro	setup_peripheral_clocks
+	@ turn on peripheral clocks:
+	@ need spi and pio clocks
+	@ see atmel at91sam7s pdf page 34 (peripheral identifiers)
+	ldr	r1, =0
+	ldr	r0, =bit00
+	add	r1, r1, r0, lsl #2	@ enable pio clock
+	add	r1, r1, r0, lsl #5	@ enable spi clock
+	add	r1, r1, r0, lsl #12	@ enable timer counter 0 clock
+	add	r1, r1, r0, lsl #13	@ enable timer counter 1 clock
+	ldr	r0, =PMC
+	str	r1, [r0, #PMC_Peripheral_Clock_Enable_Register_offset]
+.endm
+
+.macro	setup_main_oscillator
+	@ setup main oscillator:
+	ldr	r0, =bit00
+	ldr	r1, =0
+	.if	use_crystal
+		add	r1, r1, r0, lsl #0	@ enable main oscillator
+	.endif
+	.if	use_external_oscillator
+		add	r1, r1, r0, lsl #1	@ bypass main oscillator (to allow an external oscillator to drive xin)
+	.endif
+	ldr	r0, =255	@ oscount = 8*# of slow clock cycles in 1.4 ms (for a 16-20 MHz crystal) - this seems inconsistent
+	@ it's 8 bits, which means at most we can have 31.875 slow clock cycles, which is just over 1ms
+	@ but the datasheet specifies 14.5ms for a 3MHz crystal
+	add	r1, r1, r0, lsl #8
+	ldr	r0, =PMC
+	str	r1, [r0, #PMC_Clock_Generator_Main_Oscillator_Register_offset]
+.endm
+
+.macro	setup_pll
+@	ldr	r0, =bit00
+	ldr	r1, =0b111111<<8	@ pllcount
+	add	r1, r1, #1<<log_base_2_of_pll_divisor	@ div
+	ldr	r0, =pll_multiplier<<16	@ mul
+	add	r1, r1, r0
+	ldr	r0, =PMC
+	str	r1, [r0, #PMC_Clock_Generator_PLL_Register_offset]
+.endm
+
+.macro	wait_for_mckrdy	temporary_register_1, temporary_register_2
+	@ this destroys the flags
+2:	@ wait for master clock to settle (~1.4 ms)
+	ldr	\temporary_register_2, =PMC
+	ldr	\temporary_register_1, [\temporary_register_2, #PMC_Status_Register_offset]
+	tst	\temporary_register_1, #0b1000	@ master clock ready bit
+	bEQ	2b
+.endm
+
+.macro	setup_master_clock
+	@ setup master clock:
+	@ see top of page 217 if using pll - that's just so you don't kick the master clock to 48MHz and then divide it by 3 to get the processor clock
+	ldr	r0, =PMC
+	ldr	r1, [r0, #PMC_Master_Clock_Register_offset]
+	and	r1, r1, #0b11100
+	.if	use_pll
+		ldr	r2, =0b11	@ select PLL clock as master clock
+	.else
+		ldr	r2, =0b01	@ select main oscillator clock as master clock
+	.endif
+@	add	r1, r1, #0b11	@ select PLL clock
+@	add	r1, r1, #0b01	@ select main oscillator clock as master clock
+	add	r1, r1, r2
+	str	r1, [r0, #PMC_Master_Clock_Register_offset]
+	wait_for_mckrdy	temporary_register_1=r3, temporary_register_2=r4
+	ldr	r1, =0b000	@ set processor clock to master clock
+@	ldr	r1, =0b001	@ set processor clock to master clock / 2
+@	ldr	r1, =0b010	@ set processor clock to master clock / 4
+@	ldr	r1, =0b011	@ set processor clock to master clock / 8
+@	ldr	r1, =0b100	@ set processor clock to master clock / 16
+@	ldr	r1, =0b101	@ set processor clock to master clock / 32
+@	ldr	r1, =0b110	@ set processor clock to master clock / 64
+	add	r1, r2, r1, lsl #2
+@	ldr	r0, =PMC
+	str	r1, [r0, #PMC_Master_Clock_Register_offset]
+.endm
+
+.macro	setup_master_clock_again	divisor=1
+	@ setup master clock:
+	@ see top of page 217 if using pll
+	ldr	r0, =PMC
+	ldr	r1, [r0, #PMC_Master_Clock_Register_offset]
+	and	r1, r1, #0b11100
+	.if	use_pll
+		ldr	r2, =0b11	@ select PLL clock as master clock
+	.else
+		ldr	r2, =0b01	@ select main oscillator clock as master clock
+	.endif
+@	add	r1, r1, #0b11	@ select PLL clock
+@	add	r1, r1, #0b01	@ select main oscillator clock as master clock
+	add	r1, r1, r2
+	str	r1, [r0, #PMC_Master_Clock_Register_offset]
+setup_master_clock_again_2:
+	@ wait for master clock to settle (~1.4 ms)
+	ldr	r3, [r0, #PMC_Status_Register_offset]
+	tst	r3, #0b1000	@ master clock ready bit
+	bEQ	setup_master_clock_again_2
+	ldr	r1, =0b000		@ set processor clock to master clock
+	.ifc	divisor,2
+		ldr	r1, =0b001	@ set processor clock to master clock / 2
+	.endif
+	.ifc	divisor,4
+		ldr	r1, =0b010	@ set processor clock to master clock / 4
+	.endif
+	.ifc	divisor,8
+		ldr	r1, =0b011	@ set processor clock to master clock / 8
+	.endif
+	.ifc	divisor,16
+@@		ldr	r1, =0b100	@ set processor clock to master clock / 16
+	.endif
+	.ifc	divisor,32
+@@		ldr	r1, =0b101	@ set processor clock to master clock / 32
+	.endif
+	.ifc	divisor,64
+@@		ldr	r1, =0b110	@ set processor clock to master clock / 64
+	.endif
+	add	r1, r2, r1, lsl #2
+@	ldr	r0, =PMC
+	str	r1, [r0, #PMC_Master_Clock_Register_offset]
+	get_master_clock_frequency
+	setup_periodic_interval_timer
+	setup_timer_channel_0_for_inline_millisecond_delays
+	setup_timer_channel_1_to_keep_track_of_partial_seconds
+.endm
+
+@ notes:
+@ the main clock is derived from the external crystal or oscillator
+@ the master clock is either the {rc (slow) clock, the main clock or the pll clock} divided by the prescaling factor
+@ the pll clock is the main clock * (mul+1)/div
+@ the prescaling happens before the "master"ness so that the usb (etc) can be clocked from the pll and the processor can be slower
+
+.macro	get_master_clock_frequency
+.global master_clock_frequency
+	.ifeq	use_rc_clock_only
+	ldr	r1, =PMC
+	ldr	r0, =bit00
+	mov	r0, r0, lsl #16
+0:	ldr	r2, [r1, #PMC_Clock_Generator_Main_Clock_Frequency_Register_offset]
+	tst	r2, r0
+	bEQ	0b
+	ldr	r0, =0xffff
+	and	r0, r0, r2
+@		ldr	r1, =master_clock_frequency
+@		str	r0, [r1]
+@	mov	r0, r2, lsr #8
+@	ldr	r1, =PIOA
+@	str	r2, [r1, #Set_Output_Data_Register_offset]
+	ldr	r1, =rc_clock_frequency	@ set this closer to the actual clock frequency of the rc slow clock
+	mul	r2, r0, r1
+	mov	r2, r2, lsr #4
+	ldr	r0, =main_clock_frequency
+	str	r2, [r0]
+	ldr	r0, =PMC
+	ldr	r0, [r0, #PMC_Master_Clock_Register_offset]
+	mov	r1, r0
+	ldr	r2, =0b11	@ this selects the css field
+	and	r0, r0, r2
+	cmp	r0, #0b01
+@ if this test is not true, the master clock is not = the main clock
+	mov	r1, r1, lsr #2
+	ldr	r2, =0b111	@ this selects the pres field
+	and	r1, r1, r2
+@	ldr	r0, #bit00
+@	mov	r0, r0, lsl r1
+	ldr	r0, =main_clock_frequency
+	ldr	r0, [r0]
+	.if	use_pll
+		ldr	r2, =pll_multiplier
+		mul	r0, r2, r0	@ this can overrun 32 bits; if it does, put the divide statement above this one
+		mov	r0, r0, lsr #log_base_2_of_pll_divisor
+		ldr	r2, =pll_clock_frequency
+		str	r0, [r2]
+	.endif
+	mov	r0, r0, lsr r1	@ take main_clock_frequency (or pll_clock_frequency) and divide it by 2^pres to calculate master_clock_frequency
+@	mov	r0, r1
+	ldr	r1, =master_clock_frequency
+	str	r0, [r1]
+	.else
+	ldr	r0, =30000
+	ldr	r1, =master_clock_frequency
+	str	r0, [r1]
+	.endif
+.endm
+
+.macro	setup_periodic_interval_timer
+	@ this must come only after a call to get_master_clock_frequency
+	ldr	r0, =PIT
+	ldr	r1, =bit00
+	ldr	r2, =master_clock_frequency
+	ldr	r2, [r2]
+	mov	r2, r2, lsr #4
+	ldr	r3, =timer_frequency
+	str	r2, [r3]
+	mov	r3, r2, lsr #10	@ 1s/1024 ~ 977 microseconds
+	add	r3, r3, r2, lsr #15
+	sub	r3, r3, r2, lsr #17
+@	ldr	r2, =500
+@	add	r3, r3, r2
+	@ 1/1000 ~ 1/1024 + 1/32768 - 1/131072
+	@ r3 = master_clock_frequency / 16 / 999.5 => 1.001ms
+	ldr	r2, =number_of_timer_clock_ticks_in_one_millisecond
+	str	r3, [r2]
+@	ldr	r3, =1151	@ (18432000 Hz / 16) = 1152000 Hz, so every 1152 ticks, we get 1ms
+	cmp	r3, #0
+	ldrEQ	r3, =2	@ 30,000 / 16 -> 2 per ms
+	add	r3, r3, r1, lsl #24	@ PIT enable
+@	add	r3, r3, r1, lsl #25	@ PIT interrupt enable
+@		debug	r3
+@		ldr	r4, =dummy_4+16
+@		str	r3, [r4], #4
+@		inc	r3
+@		str	r3, [r4]
+	str	r3, [r0, #Periodic_Interval_Timer_Mode_Register_offset]
+@	str	r3, [r0, #Periodic_Interval_Value_Register_offset]
+@	str	r3, [r0, #Periodic_Interval_Image_Register_offset]
+.endm
+
+.macro	setup_timer_channel_0_for_inline_millisecond_delays
+	ldr	r0, =TC0
+	ldr	r1, =bit00
+	ldr	r2, =0
+@	add	r2, r2, r1, lsl #0	@ enable this clock
+	add	r2, r2, r1, lsl #1	@ disable this clock
+@	add	r2, r2, r1, lsl #2	@ trigger this clock to reset and start counting
+	str	r2, [r0, #TC_Channel_Control_Register_offset]
+@	ldr	r3, =0b000	@ select timer_clock1 = master clock / 2^1
+@	ldr	r3, =0b001	@ select timer_clock2 = master clock / 2^3
+	ldr	r3, =0b010	@ select timer_clock3 = master clock / 2^5
+@	ldr	r3, =0b011	@ select timer_clock4 = master clock / 2^7
+@	ldr	r3, =0b100	@ select timer_clock5 = master clock / 2^10
+@	ldr	r3, =0b101	@ select external clock xc0
+@	ldr	r3, =0b110	@ select external clock xc1
+@	ldr	r3, =0b111	@ select external clock xc2
+	.if	use_rc_clock_only
+	ldr	r3, =0b010	@ select timer_clock3 = master clock / 2^5
+	.endif
+	@ 18,432,000 Hz / 1024 = 18,000 per second, so 18 per millisecond
+	ldr	r1, =master_clock_frequency
+	ldr	r1, [r1]
+	mov	r4, #2
+	mul	r4, r3, r4
+	add	r4, r4, #1
+	cmp	r3, #0b100
+	addEQ	r4, r4, #1
+	@ r4 is now set to the number of bits by which the master clock is divided, above
+	mov	r2, r1, lsr #10
+	add	r2, r2, r1, lsr #15
+	sub	r2, r2, r1, lsr #17
+	@ r2 ~ master clock frequency / 1000
+@		ldr	r1, =500
+@		add	r2, r2, r1
+@	ldr	r1, =bit00
+@	mov	r1, r1, lsl r4
+@	mov	r1, r1, lsr #1
+@	add	r2, r1, r2
+	@ added "0.5" before dividing so rounding will be correct
+	mov	r2, r2, lsr r4
+	ldr	r1, =number_of_TC0_clock_periods_in_one_millisecond
+	.if	use_rc_clock_only
+	ldr	r2, =1
+	.endif
+	str	r2, [r1]
+	str	r3, [r0, #TC_Channel_Mode_Register_offset]
+.endm
+
+.macro	setup_timer_channel_1_to_keep_track_of_partial_seconds
+	ldr	r0, =TC1
+	ldr	r1, =bit00
+	ldr	r2, =0
+@	add	r2, r2, r1, lsl #0	@ enable this clock
+	add	r2, r2, r1, lsl #1	@ disable this clock
+@	add	r2, r2, r1, lsl #2	@ trigger this clock to reset and start counting
+	str	r2, [r0, #TC_Channel_Control_Register_offset]
+@	ldr	r3, =0b000	@ select timer_clock1 = master clock / 2^1
+@	ldr	r3, =0b001	@ select timer_clock2 = master clock / 2^3
+@	ldr	r3, =0b010	@ select timer_clock3 = master clock / 2^5
+@	ldr	r3, =0b011	@ select timer_clock4 = master clock / 2^7
+	ldr	r3, =0b100	@ select timer_clock5 = master clock / 2^10
+@	ldr	r3, =0b101	@ select external clock xc0
+@	ldr	r3, =0b110	@ select external clock xc1
+@	ldr	r3, =0b111	@ select external clock xc2
+	@ 18,432,000 Hz / 1024 = 18,000 per second, so 18 per millisecond
+	ldr	r1, =master_clock_frequency
+	ldr	r1, [r1]
+	mov	r4, #2
+	mul	r4, r3, r4
+	add	r4, r4, #1
+	cmp	r3, #0b100
+	addEQ	r4, r4, #1
+	@ r4 is now set to the number of bits by which the master clock is divided, above
+	mov	r2, r1, lsr #4
+	add	r2, r2, r1, lsr #5
+	add	r2, r2, r1, lsr #8
+	add	r2, r2, r1, lsr #9
+	add	r2, r2, r1, lsr #12
+	add	r2, r2, r1, lsr #13
+	add	r2, r2, r1, lsr #16
+	@ r2 ~ master clock frequency / 10
+@		ldr	r1, =500
+@		add	r2, r2, r1
+@	ldr	r1, =bit00
+@	mov	r1, r1, lsl r4
+@	mov	r1, r1, lsr #1
+@	add	r2, r1, r2
+	@ added "0.5" before dividing so rounding will be correct
+	mov	r2, r2, lsr r4
+	ldr	r1, =number_of_TC1_clock_periods_in_one_tenth_of_a_second
+	str	r2, [r1]
+	str	r3, [r0, #TC_Channel_Mode_Register_offset]
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	setup_data_bus
+	@ setup data bus:
+	ldr	r2, =0xffffffff
+	set_bitmask_in_parallel_io_port_a_controller_register bitmask_register=r2, address_offset=Output_Write_Disable_Register_offset, saveregs=no
+	ldr	r2, =data_bus_port_a_bitmask
+	set_bitmask_in_parallel_io_port_a_controller_register bitmask_register=r2, address_offset=Output_Write_Enable_Register_offset, saveregs=no
+	ldr	r2, =data_bus_port_a_bitmask
+	set_bitmask_in_parallel_io_port_a_controller_register bitmask_register=r2, address_offset=Set_Output_Data_Register_offset, saveregs=no
+	ldr	r2, =data_bus_port_a_bitmask
+	set_bitmask_in_parallel_io_port_a_controller_register bitmask_register=r2, address_offset=Pull_Up_Enable_Register_offset, saveregs=no
+@	set_bitmask_in_parallel_io_port_a_controller_register bitmask_register=r2, address_offset=Output_Disable_Register_offset, saveregs=no
+	ldr	r2, =data_bus_port_a_bitmask
+	set_bitmask_in_parallel_io_port_a_controller_register bitmask_register=r2, address_offset=Output_Enable_Register_offset, saveregs=no
+	ldr	r2, =data_bus_port_a_bitmask
+	set_bitmask_in_parallel_io_port_a_controller_register bitmask_register=r2, address_offset=PIO_Enable_Register_offset, saveregs=no
+.endm
+
+.macro	setup_display_control_lines	@ rd#, wr#, cs#, d/c#, display_reset
+	ldr	r0, =0
+	ldr	r1, =bit00
+	add	r0, r0, r1, lsl #display_rd_port_a_bit
+	add	r0, r0, r1, lsl #display_wr_port_a_bit
+	add	r0, r0, r1, lsl #display_dc_port_a_bit
+	add	r0, r0, r1, lsl #display_cs_port_a_bit
+	add	r0, r0, r1, lsl #display_reset_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Set_Output_Data_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=PIO_Enable_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Pull_Up_Enable_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Output_Enable_Register_offset, saveregs=yes
+.endm
+
+.macro	setup_rotary_encoder_input_lines
+	ldr	r0, =0
+	ldr	r1, =bit00
+	add	r0, r0, r1, lsl #rotary_encoder_a_port_a_bit
+	add	r0, r0, r1, lsl #rotary_encoder_b_port_a_bit
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=PIO_Enable_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Pull_Up_Disable_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Output_Disable_Register_offset, saveregs=yes
+.endm
+
+.macro	setup_debugging_output_lines
+	ldr	r0, =0
+	ldr	r1, =bit00
+	add	r0, r0, r1, lsl #general_purpose_output_a
+	add	r0, r0, r1, lsl #general_purpose_output_b
+	add	r0, r0, r1, lsl #general_purpose_output_c
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Set_Output_Data_Register_offset, saveregs=yes
+	@set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Clear_Output_Data_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=PIO_Enable_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Pull_Up_Enable_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=Output_Enable_Register_offset, saveregs=yes
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	setup_user_reset
+	@ enable user reset via reset button:
+	ldr	r0, =RSTC
+	ldr	r1, =1	@ allow the external pin to reset the device
+@	ldr	r1, =0	@ don't allow the external pin to reset the device
+	ldr	r2, =0x4	@ reset must be asserted for at least 2^(n+1) slow clock cycles
+	add	r1, r1, r2, lsl #8
+	ldr	r2, =0xa5	@ key
+	add	r1, r1, r2, lsl #24
+@	ldr	r1, =0xa5000401
+	str	r1, [r0, #Reset_Controller_Mode_Register_offset]
+.endm
+
+.macro	setup_adc
+	@ set the adc mode register:
+@	ldr	r0, =master_clock_frequency
+@	ldr	r0, [r0]
+@	mov	r1, r0, lsr #1 @ divide by 2
+@	mov	r1, r1, lsr	#23	@ divide by adcclock=2^23, which is bigger than 5 million (maximum 10 bit clock is 5MHz)
+@	sub	r1, r1, #1	@ subtract 1
+@	mov	r2, r1, lsl #8	@ prescal
+@	mov	r3, 
+	ldr	r0, =1	@ prescal = 1, so adcclock = mck/[2*(prescal+1)] = 20MHz/4 = 5MHz and 250kHz for mck=1MHz
+	mov	r1, r0, lsl #8
+	ldr	r0, =12	@ startup = 12, so startup time = 8(startup+1)/adcclock = 104/adcclock = 20.8us for 20MHz and 416us for 1MHz
+	mov	r1, r0, lsl #16
+	ldr	r0, =2	@ shtim = 2, so sample&hold time = (shtim+1)/adcclock = 3/adcclock = 600ns for 20MHz and 12us for 1MHz
+	mov	r1, r0, lsl #24
+	ldr	r0, =ADC
+	str	r1, [r0, #ADC_Mode_Register_offset]
+	@ enable channels in the adc:
+	ldr	r1, =0b00010000	@ straight-up bitmask
+	str	r1, [r0, #ADC_Channel_Enable_offset]
+.endm
+
+.macro	setup_spi_for_rtc
+	ldr	r0, =SPI
+	ldr	r1, =bit00	@ SPI enable
+	str	r1, [r0, #SPI_Control_Register_offset]
+	ldr	r2, =0
+	add	r2, r2, r1	@ SPI master mode
+@	add	r2, r2, r1, lsl #1	@ variable peripheral select (used if talking to more than one device)
+@	add	r2, r2, r1, lsl #2	@ chip-selects are connected to a 4-to-16 decoder
+	str	r2, [r0, #SPI_Mode_Register_offset]
+	ldr	r2, =0
+	add	r2, r2, r1	@ CPOL = 1
+@	add	r2, r2, r1, lsl #1	@ NCPHA = leading edge capture, rising edge set
+@	add	r2, r2, r1, lsl #3	@ chip select remains active after a transfer
+	ldr	r3, =5
+	add	r2, r2, r3, lsl #8	@ divide MCK by 5 to get spi clock (4MHz is the max for the DS3234, so this is good up to 20MHz)
+	str	r2, [r0, #SPI_Chip_Select_Register_0_offset]
+	ldr	r0, =spi_port_a_bitmask
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=PIO_Peripheral_A_Select_Register_offset, saveregs=yes
+	set_bitmask_in_parallel_io_port_a_controller_register	bitmask_register=r0, address_offset=PIO_Disable_Register_offset, saveregs=yes
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	copy_text_to_data
+	@ copies block of ram variable initializations from flash to ram
+	ldr	r1, =_etext
+	ldr	r2, =_data
+	ldr	r3, =_edata
+0:
+	cmp	r2, r3
+	ldrLO	r0, [r1], #4	@ if r2 is less than r3, load r0 from [r1] and add 4 to r1
+	strLO	r0, [r2], #4	@ if r2 is less than r3, store r0 in [r2] and add 4 to r2
+	bLO	0b
+.endm
+
+.macro	clear_bss
+	@ clears ram variables that are supposed to be initialized to zero
+	mov	r0, #0
+	ldr	r1, =_bss_start
+	ldr	r2, =_bss_end
+0:
+	cmp	r1, r2
+	strLO	r0, [r1], #4
+	bLO	0b
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	clear_display
+	display_write_command_immediate	0x8e	@ clear window
+	display_write_data_immediate	0
+	display_write_data_immediate	0, mode_is_already_set=yes
+	display_write_data_immediate	131, mode_is_already_set=yes
+	display_write_data_immediate	131, mode_is_already_set=yes
+.endm
+
+.macro	setup_display
+	@ the display doesn't need its write line to change between transfers, so we activate it when we boot up and only deactivate it/reactivate it if we need to read from the display (which we may never have to do)
+	ldr r0,=PIOA
+	ldr	r1, =bit00
+	mov	r2, r1, lsl #display_wr_port_a_bit
+	str	r2, [r0, #Clear_Output_Data_Register_offset]	@ activate write
+
+	@display_write_command_immediate	0xa4	@ turn all pixels off (black)
+	display_write_command_immediate	0xae	@ sleep mode on (this turns off the display)
+
+	clear_display
+
+	display_write_command_immediate	0xb1
+	display_write_data_immediate	0b10001	@ phase 1 period of 1 dclk, plase 2 period of 1 dclk
+
+	display_write_command_immediate	0xb3
+	display_write_data_immediate	0b11110000	@ oscillator frequency proportional to 1111b (maximum), divide by 1
+
+	display_write_command_immediate	0xa0
+	display_write_data_immediate	0b10111100 @ horizontal address increment, don't mirror vertically, colors C-B-A, 9-bit interface, multiplex, odd/even split, 18 bit color
+@	display_write_data_immediate	0b10101100 @ horizontal address increment, mirror vertically, colors C-B-A, 9-bit interface, multiplex, odd/even split, 18 bit color
+
+	display_write_command_immediate	0xb0
+	display_write_data_immediate	0b101	@ external VSL
+
+	display_write_command_immediate	0xad
+	display_write_data_immediate	0b10001110	@ external Vcc, internal pre-charge voltage source
+
+	display_write_command_immediate	0xbb
+	display_write_data_immediate	0x1c	@ set pre-charge voltage of color A to 1ch
+	display_write_data_immediate	0x1c, mode_is_already_set=yes	@ B
+	display_write_data_immediate	0x1c, mode_is_already_set=yes	@ C
+
+	display_write_command_immediate	0xbe
+	display_write_data_immediate	0x1f	@ set Vcomh to 1fh
+
+	display_write_command_immediate	0xc1
+@	display_write_data_immediate	0xaa	@ set contrast current for color A
+@	display_write_data_immediate	0xb4, mode_is_already_set=yes	@ B
+@	display_write_data_immediate	0xc8, mode_is_already_set=yes	@ C
+	display_write_data_immediate	0xff	@ set contrast current for color A
+	display_write_data_immediate	0xff, mode_is_already_set=yes	@ B
+	display_write_data_immediate	0xff, mode_is_already_set=yes	@ C
+
+	display_write_command_immediate	0xca
+	display_write_data_immediate	0x7f	@ set mux ratio to 7fh
+
+	display_write_command_immediate	0xa1
+	@display_write_data_immediate	0	@ start with row 0
+	display_write_data_immediate	124	@ this is how to get it to make 0,0 in the upper left hand corner
+	@display_write_data_immediate	64	@ this is how to set the vertically scroll
+
+	display_write_command_immediate	0x92
+	display_write_data_immediate	0x01	@ fill rectangles and circles
+
+	ldr	r0, =0x05
+	display_set_master_current_from_register	master_current_register=r0
+@	display_write_command_immediate	0xc7
+@	display_write_data_immediate	0x0	@ set master current to minimum
+@	display_write_data_immediate	0xf	@ set master current to maximum
+
+	display_write_command_immediate	0x15
+	display_write_data_immediate	0	@ set column start address
+	display_write_data_immediate	127, mode_is_already_set=yes	@ set column end address
+
+	display_write_command_immediate	0x75
+@	display_write_data_immediate	4	@ set row start address
+@	display_write_data_immediate	127, mode_is_already_set=yes	@ set row end address
+	display_write_data_immediate	0	@ set row start address
+	display_write_data_immediate	123, mode_is_already_set=yes	@ set row end address
+
+	@ the following delay is necessary so that we don't start writing to the display ram while it's clearing the ram
+	@ writing commands to the display is still okay here, just not data to the ram
+	@ only remove this if you can guarantee that there'll be that much of a delay before the first write to display ram
+	@delay_imm	6000
+@	delay_imm	600
+
+	display_sleep_mode_off
+	display_normal_mode
+@		display_turn_all_pixels_off
+@		display_turn_all_pixels_on
+@		display_sleep_mode
+.endm
+
+.macro	display_turn_all_pixels_off
+	display_write_command_immediate	0xa4	@ turn all pixels off (black)
+.endm
+
+.macro	display_sleep_mode_on
+	display_write_command_immediate	0xae	@ sleep mode on (this turns off the display)
+.endm
+
+.macro	display_sleep_mode_off
+	display_write_command_immediate	0xaf	@ sleep mode off
+.endm
+
+.macro	display_normal_mode
+	display_write_command_immediate	0xa6	@ normal display
+.endm
+
+.macro	display_turn_all_pixels_on
+	display_write_command_immediate	0xa5	@ turn all pixels on (white)
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
+.macro	initialize_arm7_oled_clock
+	@ initialize everything:
+@	call	clear_ram
+	setup_watchdog_timer
+	setup_data_bus	@ this disables all outputs first, then enables the ones it needs, so it must come before the other setup_outputs macros
+	setup_debugging_output_lines
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+	setup_main_oscillator
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+@		fill_ram	fill=0x45457877
+@	.ifeq	prototype
+	setup_pll
+@	.endif
+	.ifeq	use_rc_clock_only
+		setup_master_clock
+@		fill_ram	fill=0xababcdcd
+	.endif
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+		call	toggle_general_purpose_output_a
+	call	clear_ram
+	copy_text_to_data
+	clear_bss
+@		fill_ram	fill=0x12123433
+		call	toggle_general_purpose_output_a
+.macro	wait_indefinitely
+0:	b	0b
+.endm
+@		wait_indefinitely
+@		fill_ram	fill=0x44444444
+	setup_user_reset
+		call	toggle_general_purpose_output_a
+	setup_display_control_lines
+		call	toggle_general_purpose_output_a
+	setup_peripheral_clocks
+		call	toggle_general_purpose_output_a
+	setup_embedded_flash_controller
+		call	toggle_general_purpose_output_a
+@		fill_ram	fill=0x55555555
+@		fill_ram	fill=0x66666663
+@		fill_ram	fill=0x77777777
+@		fill_ram	fill=0x88888883
+
+	ldr	r0, =debug_stack_pointer
+	ldr	r1, =beginning_of_debug_stack
+	str	r1, [r0]
+@		debug	r15
+		call	toggle_general_purpose_output_a
+
+	get_master_clock_frequency
+		call	toggle_general_purpose_output_a
+	setup_periodic_interval_timer
+		call	toggle_general_purpose_output_a
+	setup_timer_channel_0_for_inline_millisecond_delays
+		call	toggle_general_purpose_output_a
+	setup_timer_channel_1_to_keep_track_of_partial_seconds
+		call	toggle_general_purpose_output_a
+
+@		debug	r15
+
+	setup_rotary_encoder_input_lines
+
+@ bug/future:  these two would benefit from knowing the actual clock rate
+@ bug/future:  but that's a problem if we change the clock rate later...
+	setup_adc
+	setup_spi_for_rtc
+
+		call	toggle_general_purpose_output_a
+	setup_display
+		call	toggle_general_purpose_output_a
+@		debug	r15
+
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	mov	r2, r1, lsl #general_purpose_output_b
+	str	r2, [r0, #Clear_Output_Data_Register_offset]
+	call	generate_lookup_tables_64
+	ldr	r0, =PIOA
+	ldr	r1, =bit00
+	mov	r2, r1, lsl #general_purpose_output_b
+	str	r2, [r0, #Set_Output_Data_Register_offset]
+
+@	call	show_lookup_table
+@	delay_imm	50
+
+@	call	draw_a_red_border_around_the_screen
+@	delay_imm	500
+
+		call	toggle_general_purpose_output_a
+	call	draw_clock_face
+		call	toggle_general_purpose_output_a
+
+	ldr	r0, =rotary_encoder_value
+@ bug/future:  save last state & restore upon power-up?
+@	ldrb	r1, [r0]
+	ldr	r1, =5
+	keep_it_between_signed	min=0, it=r1, max=123
+	strb	r1, [r0]
+
+		call	toggle_general_purpose_output_a
+	ldr	r0, =rotary_encoder_previous_position
+	ldr	r1, =0b01
+	strb	r1, [r0]
+	ldr	r0, =rotary_encoder_current_position
+	ldr	r1, =0b10
+	strb	r1, [r0]
+	
+@		debug	r15
+		call	toggle_general_purpose_output_a
+	.ifeq	use_rc_clock_only
+	setup_master_clock_again	divisor=1
+	.endif
+		call	toggle_general_purpose_output_a
+.endm
+
+@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
+
