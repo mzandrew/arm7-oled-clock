@@ -16,6 +16,10 @@
 @ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
 @ or visit http://www.fsf.org/
 
+.set	default_background_color, black
+@.set	timex_background_color, 0b111110111110111110
+.set	timex_background_color, white
+
 .set	default_hour_hand_color, red
 .set	default_minute_hand_color, blue
 .set	default_second_hand_color, green

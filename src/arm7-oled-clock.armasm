@@ -72,7 +72,8 @@
 
 @.include "work/test-image-32x32.armasm"
 @.include "work/image.2007-10-10.s45-19667-cropped-small.armasm"
-.include "work/image.2007-12-11.s50-00165-cropped-enhanced-2-small.armasm"
+@.include "work/image.2007-12-11.s50-00165-cropped-enhanced-2-small.armasm"
+.include "work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.armasm"
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 

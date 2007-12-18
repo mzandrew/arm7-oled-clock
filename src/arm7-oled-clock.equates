@@ -18,13 +18,13 @@
 
 @ user-modifiable:
 
-.set	prototype, 1
+.set	prototype, 0
 .set	use_rc_clock_only, 0
 .set	use_crystal, 0
 .set	use_external_oscillator, 1
 
 @ be careful here, or it'll crank the processor clock past 55MHz (see top of page 217 in pdf):
-.set	pll_multiplier, 7
+.set	pll_multiplier, 4
 .set	log_base_2_of_pll_divisor, 4	@ 2^(this) = divisor
 @ pll frequency = main oscillator frequency / 2^(log_base_2_of_pll_divisor) * pll_multiplier
 
@@ -39,30 +39,28 @@
 
 .if	prototype
 	.set	use_pll, 0
-	.set	rc_clock_frequency, 29962
+	.set	rc_clock_frequency, 29971
 .else
 	.set	use_pll, 1
-@	.set	rc_clock_frequency, 29144
-@	.set	rc_clock_frequency, 29153
 	.set	rc_clock_frequency, 29163
 .endif
 
 .set	data_bus_port_a_bitmask, 0b111111111	@ bits PA0 to PA8 (a 9-bit interface)
 .set	display_reset_port_a_bit, 22
 .if	prototype
-.set	display_rd_port_a_bit, 27
-.set	display_wr_port_a_bit, 28
-.set	display_cs_port_a_bit, 29
-.set	display_dc_port_a_bit, 30
-.set	rotary_encoder_a_port_a_bit, 17
-.set	rotary_encoder_b_port_a_bit, 18
+	.set	display_rd_port_a_bit, 27
+	.set	display_wr_port_a_bit, 28
+	.set	display_cs_port_a_bit, 29
+	.set	display_dc_port_a_bit, 30
+	.set	rotary_encoder_a_port_a_bit, 17
+	.set	rotary_encoder_b_port_a_bit, 18
 .else
-.set	display_rd_port_a_bit, 30
-.set	display_wr_port_a_bit, 29
-.set	display_cs_port_a_bit, 28
-.set	display_dc_port_a_bit, 27
-.set	rotary_encoder_a_port_a_bit, 18
-.set	rotary_encoder_b_port_a_bit, 17
+	.set	display_rd_port_a_bit, 30
+	.set	display_wr_port_a_bit, 29
+	.set	display_cs_port_a_bit, 28
+	.set	display_dc_port_a_bit, 27
+	.set	rotary_encoder_a_port_a_bit, 18
+	.set	rotary_encoder_b_port_a_bit, 17
 .endif
 
 .set	general_purpose_output_a, 26
