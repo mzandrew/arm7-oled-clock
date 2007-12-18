@@ -1,5 +1,5 @@
 #summary Gallery of photographs of clocks in action
-#labels Photograph
+#labels Photograph,Featured
 
 = Introduction =
 
