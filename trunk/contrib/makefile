@@ -16,10 +16,15 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
 # or visit http://www.fsf.org/
 
+raw_image_list := $(wildcard *.jpeg) $(wildcard *.png)
+armasm_list := $(patsubst %.jpeg,%.armasm,$(raw_image_list))
+
 default:
-	$(MAKE) ../work/test-image-32x32.armasm
+#	$(MAKE) $(armasm_list)
+	$(foreach each,$(armasm_list),$(MAKE) $(each:%.armasm=../work/%.armasm);)
+#	$(MAKE) ../work/test-image-32x32.armasm
 #	$(MAKE) ../work/image.2007-10-10.s45-19667-cropped-small.armasm
-	$(MAKE) ../work/image.2007-12-11.s50-00165-cropped-enhanced-2-small.armasm
+#	$(MAKE) ../work/image.2007-12-11.s50-00165-cropped-enhanced-2-small.armasm
 #	../src/bmp-to-oled.perl test-image-32x32.bmp test-image-32x32.oled
 #	../src/bin-to-asm.perl test-image-32x32.oled ../work/test-image-32x32.armasm
 

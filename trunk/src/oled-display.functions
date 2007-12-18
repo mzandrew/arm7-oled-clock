@@ -48,6 +48,7 @@ draw_a_circle:
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 
+.ifdef	testmode
 draw_a_line_with_slope_magnitude_equal_to_one:
 	push	r0-r7
 	@ draw from left to right
@@ -89,6 +90,7 @@ draw_a_line_with_slope_magnitude_equal_to_one_next:
 
 	pop	r0-r7
 	return
+.endif
 
 .ifc	asdf,aheto
 draw_a_line_with_slope_magnitude_less_than_one:
@@ -218,9 +220,6 @@ erase_something_hand:
 	strb	r6, [r2]
 	strb	r7, [r3]
 	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__hand_drawing_routines__vector_table
-@	ldr	r0, =display_hand_with_circle_lines
-@	call_register	r0
-@	call	display_hand_with_circle_lines
 	ldr	r0, =display_needs_update
 	ldr	r1, =1
 	strb	r1, [r0]
@@ -302,7 +301,6 @@ display_something_hand:
 		strb	r0, [r4]
 		strb	r1, [r5]
 	vectored_call	clock_face_mode_minimum, clock_face_mode, clock_face_mode_maximum, clock_face_mode__hand_drawing_routines__vector_table
-@	call	display_hand_with_circle_lines
 @	strb	r0, [r4]
 @	strb	r1, [r5]
 	return
@@ -486,12 +484,12 @@ prepare_screen_for_drawing_on_it:
 	return
 
 clock_face_mode__prepare_screen_for_drawing_on_it__vector_table:
-@	b	make_display_pretty
 	b	clear_display_and_wait
 	b	clear_display_and_wait
 	b	clear_display_and_wait
 	b	show_image_of_timex_watch_face
 @	b	make_display_turquoise
+@	b	make_display_pretty
 
 .pool
 
@@ -506,6 +504,9 @@ setup_hand_colors_default:
 	ldr	r0, =second_hand_color
 	ldr	r1, =default_second_hand_color
 	str	r1, [r0]
+	ldr	r1, =background_color
+	ldr	r0, =default_background_color
+	str	r0, [r1]
 	pop	r0-r1
 	return
 
@@ -519,6 +520,9 @@ setup_hand_colors_timex:
 	ldr	r1, =red
 	ldr	r0, =second_hand_color
 	str	r1, [r0]
+	ldr	r1, =background_color
+	ldr	r0, =timex_background_color
+	str	r0, [r1]
 	pop	r0-r1
 	return
 
@@ -577,92 +581,17 @@ clear_display_and_wait:
 @	wait_for_n_milliseconds	n=7
 @	write_image_to_screen	x=0, y=0, address=test_image_32x32.oled
 @	write_image_to_screen	x=90, y=90, address=test_image_32x32.oled
-@	write_image_to_screen	x=0, y=0, address=image_2007_10_10_s45_19667_cropped_small_oled
-@	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_10_10_s45_19667_cropped_small_oled
-@	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_12_11_s50_00165_cropped_enhanced_2_small_oled
 	return
 
 show_image_of_timex_watch_face:
-@	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_10_10_s45_19667_cropped_small_oled
-	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_12_11_s50_00165_cropped_enhanced_2_small_oled
+	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_12_11_s50_00165_cropped_enhanced_3_small_oled
 	call	setup_hand_colors_timex
 	call	setup_hand_lengths_and_widths_for_timex_watch_face
 	return
 
 .pool
 
-make_display_turquoise:
-	push	r0-r3
-	ldr	r0, =display_first_x
-	ldr	r1, =display_last_x
-	display_set_start_column_and_end_column	start_column_register=r0, end_column_register=r1
-
-	ldr	r0, =display_first_y
-	ldr	r1, =display_last_y
-	display_set_start_row_and_end_row	start_row_register=r0, end_row_register=r1
-
-	display_write_command_immediate	0x5c	@ all further data is display ram data
-
-	ldr	r0, =turquoise
-	mov	r1, r0, lsr #9
-	ldr	r2, =display_height_in_pixels
-make_display_turquoise_row:
-	ldr	r3, =display_width_in_pixels
-make_display_turquoise_pixel:
-	display_write_data_register	r1, saveregs=yes
-	display_write_data_register	r0, saveregs=yes
-	dec	r3
-	bHS	make_display_turquoise_pixel
-	dec	r2
-	bHS	make_display_turquoise_row
-	pop	r0-r3
-	return
-
-make_display_pretty:
-	push	r0-r6
-	ldr	r0, =display_first_x
-	ldr	r1, =display_last_x
-	display_set_start_column_and_end_column	start_column_register=r0, end_column_register=r1
-
-	ldr	r0, =display_first_y
-	ldr	r1, =display_last_y
-	display_set_start_row_and_end_row	start_row_register=r0, end_row_register=r1
-
-	display_write_command_immediate	0x5c	@ all further data is display ram data
-
-	ldr	r0, =0	@ red
-	ldr	r1, =0	@ green
-	ldr	r2, =0	@ blue
-	ldr	r5, =display_height_in_pixels
-make_display_pretty_row:
-	ldr	r6, =display_width_in_pixels>>1
-make_display_pretty_pixel:
-@	add	r0, r0, #17
-	cmp	r5, #display_height_in_pixels-1
-	addHI	r0, r0, #1
-	bLS	make_display_pretty_pixel_next
-	cmp	r5, #display_height_in_pixels-2
-	addHI	r0, r0, #1
-@	add	r0, r0, #1
-@	add	r1, r1, #2
-@	add	r2, r2, #3
-	b	make_display_pretty_pixel_next
-make_display_pretty_pixel_next:
-	mov	r3, r2
-	add	r3, r3, r2, lsl #6
-	add	r3, r3, r1, lsl #12
-	mov	r4, r3, lsr #9
-	display_write_data_register	r4, saveregs=yes
-	display_write_data_register	r3, saveregs=yes
-	display_write_data_register	r4, saveregs=yes
-	display_write_data_register	r3, saveregs=yes
-	dec	r6
-	bHS	make_display_pretty_pixel
-	dec	r5
-	bHS	make_display_pretty_row
-	pop	r0-r6
-	return
-
+.ifdef	testmode
 draw_a_big_circle:
 	@ this draws a circle through where the hour markers should be
 	change_display_mode_to_NOT_fill_rectangles_and_circles
@@ -686,6 +615,7 @@ draw_a_big_circle:
 
 	change_display_mode_to_fill_rectangles_and_circles
 	return
+.endif
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 
@@ -705,7 +635,6 @@ display_12_dots_around_the_clock_face:
 	ldr	r0, =hour_dots_little_radius_others
 	ldr	r1, =radius_of_circle
 	strb	r0, [r1]
-@	ldr	r0, =grey
 	ldr	r0, =white
 	ldr	r1, =color
 	str	r0, [r1]
@@ -717,12 +646,7 @@ display_12_dots_around_the_clock_face:
 	ldr	r5, =display_center_of_hands_y
 	ldr	r8, =x_position_of_center_of_circle
 	ldr	r9, =y_position_of_center_of_circle
-@	ldr	r10, =one_twelvth_fp
-@	ldr	r12, =1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table
 	ldr	r10, =one_twelvth_of_the_lookup_table
-	ldr	r12, =dummy_1
-@	str	r10, [r12], #4
-@	str	r10, [r12]
 1:
 	mul	r11, r0, r10
 @	mul	r11, r12, r11
@@ -735,14 +659,9 @@ display_12_dots_around_the_clock_face:
 	mul	r7, r1, r7
 	mov	r6, r6, lsr #fixed_point_shift_by
 	mov	r7, r7, lsr #fixed_point_shift_by
-@	str	r0, [r12], #4
-@	str	r6, [r12], #4
-@	str	r7, [r12], #4
 	add	r6, r4, r6
 	sub	r7, r5, r7
 @	add	r7, r5, r7
-@	str	r6, [r12], #4
-@	str	r7, [r12], #4
 	strb	r6, [r8]
 	strb	r7, [r9]
 	call	draw_a_circle
@@ -754,7 +673,6 @@ display_12_dots_around_the_clock_face:
 	ldr	r0, =hour_dots_little_radius_0369
 	ldr	r1, =radius_of_circle
 	strb	r0, [r1]
-@	ldr	r0, =grey
 	ldr	r0, =white
 	ldr	r1, =color
 	str	r0, [r1]
@@ -766,12 +684,7 @@ display_12_dots_around_the_clock_face:
 	ldr	r5, =display_center_of_hands_y
 	ldr	r8, =x_position_of_center_of_circle
 	ldr	r9, =y_position_of_center_of_circle
-@	ldr	r10, =one_twelvth_fp
-@	ldr	r12, =1<<log_base_2_of_four_fifths_of_the_size_of_the_lookup_table
 	ldr	r10, =one_quarter_of_the_lookup_table
-		ldr	r12, =dummy_1
-@		str	r10, [r12], #4
-@		str	r10, [r12]
 1:
 	mul	r11, r0, r10
 @		mul	r11, r12, r11
@@ -784,14 +697,9 @@ display_12_dots_around_the_clock_face:
 	mul	r7, r1, r7
 	mov	r6, r6, lsr #fixed_point_shift_by
 	mov	r7, r7, lsr #fixed_point_shift_by
-@		str	r0, [r12], #4
-@		str	r6, [r12], #4
-@		str	r7, [r12], #4
 	add	r6, r4, r6
 	sub	r7, r5, r7
 @		add	r7, r5, r7
-@		str	r6, [r12], #4
-@		str	r7, [r12], #4
 	strb	r6, [r8]
 	strb	r7, [r9]
 	call	draw_a_circle
@@ -803,7 +711,7 @@ display_12_dots_around_the_clock_face:
 	return
 
 draw_latin_numbers_around_the_clock_face:
-@	push	r0-r12
+	push	r0-r12
 	ldr	r0, =font_color
 	ldr	r1, =default_font_color
 	str	r1, [r0]
@@ -900,7 +808,7 @@ draw_latin_numbers_around_the_clock_face_not_11:
 	cmp	r0, #12
 	bLO	draw_latin_numbers_around_the_clock_face_next
 
-@	pop	r0-r12
+	pop	r0-r12
 	return
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
@@ -950,8 +858,7 @@ clock_face_mode__erase_hands__vector_table:
 	b	draw_clock_face__erase_hands
 	b	draw_clock_face__erase_hands
 	b	draw_clock_face__erase_hands
-	b	draw_clock_face__erase_hands_to_white
-@	b	draw_clock_face__erase_hands__03
+	b	draw_clock_face__erase_hands
 
 draw_clock_face__erase_hands:
 	reset__display_needs_update
@@ -960,29 +867,6 @@ draw_clock_face__erase_hands:
 	call	erase_second_hand_if_necessary
 	return
 
-draw_clock_face__erase_hands_to_white:
-	reset__display_needs_update
-	ldr	r0, =background_color
-	ldr	r0, [r0]
-	push	r0
-	ldr	r0, =white
-	ldr	r1, =background_color
-	str	r0, [r1]
-	call	erase_hour_hand_if_necessary
-	call	erase_minute_hand_if_necessary
-	call	erase_second_hand_if_necessary
-	pop	r0
-	ldr	r1, =background_color
-	str	r0, [r1]
-	return
-
-draw_clock_face__erase_hands__03:
-	reset__display_needs_update
-	call	erase_hour_hand_if_necessary
-	call	erase_minute_hand_if_necessary
-@	call	erase_second_hand_if_necessary
-	return
-	
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 
 clock_face_mode__draw_hands__vector_table:
@@ -1061,6 +945,7 @@ set_display_brightness_based_on_ambient_light_level:
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 
+.ifdef	testmode
 draw_a_red_border_around_the_screen:
 @	push
 	draw_line_imm	display_first_x, display_last_x, display_first_y, display_first_y, 0b111111000, 0b000000000	@ first displayed row
@@ -1073,7 +958,9 @@ draw_a_red_border_around_the_screen:
 	delay_imm	55
 @	pop	r
 	return
+.endif
 
+.ifdef	testmode
 draw_a_set_of_crosshairs:
 @	push
 	draw_line_imm	display_first_x, display_last_x, display_center_y, display_center_y, 0b111111000, 0b000000000	@ center displayed row
@@ -1082,6 +969,7 @@ draw_a_set_of_crosshairs:
 	delay_imm	55
 @	pop	r
 	return
+.endif
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 

@@ -34,10 +34,10 @@ set_clock_block_read:
 set_clock_block_write:
 	.byte	0x80	@ write address
 	.byte	0x00	@ seconds
-	.byte	0x48	@ minutes
-	.byte	1<<6 + 0<<5 + 0x06	@ 12=1/24=0 hour + am=1/pm=0 + hours
-	.byte	0x07	@ day of week 0x1-0x7
-	.byte	0x08	@ day of month 0x01-0x31
+	.byte	0x49	@ minutes
+	.byte	1<<6 + 1<<5 + 0x07	@ 12=1/24=0 hour + am=1/pm=0 + hours
+	.byte	0x04	@ day of week 0x1-0x7
+	.byte	0x12	@ day of month 0x01-0x31
 	.byte	0x12	@ month of year 0x01-0x12
 	.byte	0x07	@ year of century 0x00-0x99
 
@@ -62,7 +62,7 @@ one_over_n_fp_lookup_table:
 
 .align	4
 .global	background_color
-background_color:	.word black
+background_color:	.word default_background_color
 
 .align	4
 hour_hand_color:	.word default_hour_hand_color
