@@ -1,0 +1,14 @@
+#summary Gallery of photographs of clocks in action
+#labels Photograph
+
+= Introduction =
+
+Here's some pix.
+
+= Pictures =
+
+== Prototype ==
+
+http://arm7-oled-clock.googlecode.com/files/image.2007-12-12.s50-00191-small.jpeg
+
+== Printed Circuit Board ==
