@@ -48,8 +48,14 @@ elf_to_hex_flags = --output-target=ihex
 list_of_assembly_language_files = $(list src/*.armasm) $(list src/*.s)
 list_of_c_language_files = $(list src/*.c)
 
+IS_INSTALLED_1 := $(shell which convert 2>/dev/null 1>&2; echo "$$?")
+
 default :
+ifeq ($(IS_INSTALLED_1),1)
+	@sudo apt -y install imagemagick
+endif
 	@perl -MCPAN -e "install Image::BMP"
+	if [ ! -e work ]; then mkdir work; fi
 	@convert contrib/image.2007-12-11.s50-00165-cropped-enhanced-3-small.jpeg BMP3:work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.bmp
 	@./src/bmp-to-oled.perl work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.bmp work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.oled
 	@./src/bin-to-asm.perl work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.oled work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.armasm
