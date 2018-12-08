@@ -16,10 +16,10 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
 # or visit http://www.fsf.org/
 
-assembler = arm-elf-as
-c_compiler = arm-elf-gcc
-elf_to_hex = arm-elf-objcopy
-linker = arm-elf-ld
+assembler = arm-none-eabi-as
+c_compiler = arm-none-eabi-gcc
+elf_to_hex = arm-none-eabi-objcopy
+linker = arm-none-eabi-ld
 
 #objects := $(patsubst %.c,%.o,$(wildcard *.c))
 # this list needs to have the assembly object with the interrupt vector table first
@@ -49,12 +49,18 @@ list_of_assembly_language_files = $(list src/*.armasm) $(list src/*.s)
 list_of_c_language_files = $(list src/*.c)
 
 default :
+	@perl -MCPAN -e "install Image::BMP"
+	@convert contrib/image.2007-12-11.s50-00165-cropped-enhanced-3-small.jpeg BMP3:work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.bmp
+	@./src/bmp-to-oled.perl work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.bmp work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.oled
+	@./src/bin-to-asm.perl work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.oled work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.armasm
+	@sed -i "s,work/,," work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.armasm
 	$(MAKE) -B all
-	make program
-	sleep 1
-	make dump
+	@#make program
+	@#sleep 1
+	@#make dump
 
 all :
+	#convert contrib/image.2007-12-11.s50-00165-cropped-enhanced-3-small.jpeg contrib/image.2007-12-11.s50-00165-cropped-enhanced-3-small.bmp
 	@if [ ! -d "src" ]; then mkdir "src"; fi
 	@if [ ! -d "work" ]; then mkdir "work"; fi
 #	$(foreach each,$(list_of_assembly_language_files),$(MAKE) $(each:src/%.s=work/%.o);)
@@ -63,6 +69,7 @@ all :
 	$(MAKE) work/exception-handler-vector-table.o
 	$(MAKE) work/arm7-oled-clock.hex
 #	$(MAKE) work/test.hex
+	ls -lart work/arm7-oled-clock.elf work/arm7-oled-clock.hex
 
 dependencies = src/arm7-oled-clock.armasm src/arm7-oled-clock.bss src/arm7-oled-clock.data src/arm7-oled-clock.equates src/arm7-oled-clock.functions src/arm7-oled-clock.macros src/at91sam7s.equates src/exception-handler-vector-table.armasm src/font.functions src/font.lookup-table src/generic.equates src/generic.macros src/initialization.macros src/io-pin.functions src/io-pin.macros src/math.functions src/math.macros src/oled-display.equates src/oled-display.functions src/oled-display.macros src/spi-rtc.functions src/test.c
 
@@ -101,5 +108,5 @@ jtag : ;
 	telnet localhost 4444
 
 nm : ;
-	arm-elf-nm work/arm7-oled-clock.elf
+	arm-none-eabi-nm work/arm7-oled-clock.elf
 

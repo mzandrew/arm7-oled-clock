@@ -19,10 +19,12 @@
 # or visit http://www.fsf.org/
 
 use strict;
-use lib '/home/bin/nofizbin/perl';
-use DebugInfoWarningError;
+#use lib "$ENV{HOME}/build/bin/lib";
+#use DebugInfoWarningError;
+sub debug {}
+sub error {}
 
-$DebugInfoWarningError::verbosity{"STD"}->{"debug"} = 1;
+#$DebugInfoWarningError::verbosity{"STD"}->{"debug"} = 1;
 my ($source, $destination);
 my $okay_for_source_to_be_the_same_as_destination = 0;
 my $okay_for_destination_to_not_yet_exist = 1;
@@ -114,7 +116,7 @@ if ($packed) {
 my $input_image = new Image::BMP;
 $input_image->open_file($source);
 
-unless (open(DESTINATION, ">$destination")) {
+unless (open(DESTINATION, ">", "$destination")) {
 	error(8, "can't open file \"$destination\"");
 };
 
