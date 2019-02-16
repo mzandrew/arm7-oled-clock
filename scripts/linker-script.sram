@@ -21,20 +21,17 @@
 ENTRY(reset_vector)
 
 MEMORY {
-	flash (rx) : ORIGIN = 0x100000, LENGTH = 0x10000
+/*	flash (rx) : ORIGIN = 0x100000, LENGTH = 0x10000 */
 	sram (wx) : ORIGIN = 0x200000, LENGTH = 0x4000
 }
 
 SECTIONS {
-/*	.text : { _etext = .; } >sram */
-/*	.data : { _data = .; _edata = .; } >sram */
-/*	.bss : { _bss_start = .; } >sram */
+	.text : { *(.glue_7) *(.glue_7t) _etext = .; } >sram
+	.text : { _etext = .; } >sram
+	.data : { _data = .; _edata = .; } >sram
+	.bss : { _bss_start = .; } >sram
 /*	.text : { _etext = .; } >flash */
-
-	.text : { *(.text) *(.glue_7) *(.glue_7t) _etext = .; } >flash
-/* >sram AT >flash means it belongs in sram, but it has to get programmed into flash first so it can be copied to sram upon initialization */
-	.data : { _data = .; *(.data) _edata = .; } >sram AT >flash
-	.bss : { _bss_start = .; *(.bss) } >sram
+/*	.data : { _data = .; _edata = .; } >flash */
 	_bss_end = .;
 }
 

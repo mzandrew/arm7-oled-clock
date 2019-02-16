@@ -41,7 +41,7 @@ c_warnings = -Winline
 c_compiler_flags = -S -O0 $(c_warnings) -fno-common
 
 linker_flags = -T scripts/linker-script.flash -Map work/arm7-oled-clock.map
-#linker_flags = -T scripts/linker-script.sram-above-sam-ba-boot -Map work/arm7-oled-clock.map
+#linker_flags = -T scripts/linker-script.sram -Map work/arm7-oled-clock.map
 
 elf_to_hex_flags = --output-target=ihex
 

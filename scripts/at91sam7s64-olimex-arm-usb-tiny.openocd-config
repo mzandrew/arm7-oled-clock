@@ -1,0 +1,41 @@
+# written 2018-12-13 by mza
+# based on jabberwocky-oscilloscope/jabberwocky-embedded-software/scripts/openocd-config/at91sam7s64-openocd-configuration-for-olimex-arm-usb-tiny-for-openocd-version-2007-09-05.cfg and jabberwocky-oscilloscope/jabberwocky-embedded-software/scripts/openocd-config/at91sam7a3-openocd-configuration-for-olimex-arm-usb-tiny-for-openocd-version-svn-rev-1200.cfg
+# last updated 2018-12-13 by mza
+
+telnet_port 4444
+source [find interface/ftdi/olimex-jtag-tiny.cfg]
+adapter_khz 4000
+transport select jtag
+adapter_nsrst_delay 200
+jtag_ntrst_delay 200
+reset_config srst_only srst_pulls_trst
+
+jtag newtap sam7s64 cpu -irlen 4 -ircapture 0x1 -irmask 0xf -expected-id 0x3f0f0f0f
+target create sam7s64.cpu arm7tdmi -chain-position sam7s64.cpu -endian little -work-area-phys 0x200000 -work-area-size 0x1000 -work-area-backup 0
+flash bank myflash at91sam7 0 0 0 0 sam7s64.cpu
+
+init
+sleep 200
+halt
+sleep 200
+#mww 0xfffffc30 0x00000001
+#mww 0xfffffc30 0x00000000
+
+# debug stack:
+mdw 0x203a54 128
+
+# this is to load up an elf file and run it:
+#load_image work/arm7-oled-clock.elf
+#mww 0xfffffc30 0x00000003
+#resume 0x00200000
+
+# this is to program the flash memory from a hex file:
+#flash erase_address unlock 0x00100000 0x10000
+#flash write_image work/arm7-oled-clock.hex
+
+# this is to reset to the start of the program in flash memory:
+resume 0
+#resume 0x100000
+
+exit
+

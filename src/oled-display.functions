@@ -584,7 +584,8 @@ clear_display_and_wait:
 	return
 
 show_image_of_timex_watch_face:
-	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_12_11_s50_00165_cropped_enhanced_3_small_oled
+	b clear_display_and_wait
+@	write_15_bit_packed_image_to_screen	x=0, y=0, address=image_2007_12_11_s50_00165_cropped_enhanced_3_small_oled
 	call	setup_hand_colors_timex
 	call	setup_hand_lengths_and_widths_for_timex_watch_face
 	return
@@ -945,7 +946,7 @@ set_display_brightness_based_on_ambient_light_level:
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 
-.ifdef	testmode
+@.ifdef	testmode
 draw_a_red_border_around_the_screen:
 @	push
 	draw_line_imm	display_first_x, display_last_x, display_first_y, display_first_y, 0b111111000, 0b000000000	@ first displayed row
@@ -958,7 +959,7 @@ draw_a_red_border_around_the_screen:
 	delay_imm	55
 @	pop	r
 	return
-.endif
+@.endif
 
 .ifdef	testmode
 draw_a_set_of_crosshairs:

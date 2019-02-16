@@ -73,7 +73,7 @@
 @.include "work/test-image-32x32.armasm"
 @.include "work/image.2007-10-10.s45-19667-cropped-small.armasm"
 @.include "work/image.2007-12-11.s50-00165-cropped-enhanced-2-small.armasm"
-.include "work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.armasm"
+@.include "work/image.2007-12-11.s50-00165-cropped-enhanced-3-small.armasm"
 
 @	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@	@
 
@@ -85,7 +85,7 @@ reset_vector:
 	initialize_arm7_oled_clock
 @	call	show_lookup_table
 
-@	call	draw_a_red_border_around_the_screen
+	call	draw_a_red_border_around_the_screen
 @	call	draw_a_set_of_crosshairs
 
 @	call	write_rtc

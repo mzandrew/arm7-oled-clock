@@ -656,6 +656,8 @@ setup_master_clock_again_2:
 		call	toggle_general_purpose_output_a
 	setup_display_control_lines
 		call	toggle_general_purpose_output_a
+	display_pulse_reset
+		call	toggle_general_purpose_output_a
 	setup_peripheral_clocks
 		call	toggle_general_purpose_output_a
 	setup_embedded_flash_controller
